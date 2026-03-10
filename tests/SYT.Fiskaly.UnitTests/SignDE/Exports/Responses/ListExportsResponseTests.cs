@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SYT.Fiskaly.Serialization;
-using SYT.Fiskaly.SignDE.Common.Enums;
+using SYT.Fiskaly.Common.Enums;
 using SYT.Fiskaly.SignDE.Exports.Responses;
 
 namespace SYT.Fiskaly.UnitTests.SignDE.Exports.Responses;

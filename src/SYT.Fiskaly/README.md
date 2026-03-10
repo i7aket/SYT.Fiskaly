@@ -1,21 +1,25 @@
 # SYT.Fiskaly
 
-`SYT.Fiskaly` is a production-oriented .NET SDK for Fiskaly SIGN DE v2
-(German fiscal compliance, KassenSichV / AO 146a).
+`SYT.Fiskaly` is a production-oriented .NET SDK for Fiskaly SIGN DE v2 and the Fiskaly
+Management API.
 
-It provides strongly typed clients and resilient HTTP pipelines for:
-- TSS lifecycle (`ITssClient`)
-- Client lifecycle (`IClientManagementClient`)
-- Transactions (`ITransactionClient`)
-- Exports (`IExportClient`)
-- Management API organizations (`IOrganizationClient`)
-- Authentication (`IFiskalyAuthenticationService`)
+It provides strongly typed clients, resilient HTTP pipelines, typed identifiers, and
+configuration validation for:
+- TSS lifecycle via `ITssClient`
+- Client lifecycle via `IClientManagementClient`
+- Transactions via `ITransactionClient`
+- Exports via `IExportClient`
+- Management API organizations via `IOrganizationClient`
+- Management API API keys via `IApiKeyClient`
+- Authentication via `IFiskalyAuthenticationService`
+- Scoped per-organization credentials via `IFiskalyCredentialScopeFactory`
 
 ## Package
 
 - Package ID: `SYT.Fiskaly`
-- Current channel: `1.0.0-rc.1`
+- Current channel: `1.0.0-rc.2`
 - Target framework: `net10.0`
+- License: `MIT`
 - Repository: `https://github.com/i7aket/SYT.Fiskaly`
 
 ## Installation
@@ -24,9 +28,9 @@ It provides strongly typed clients and resilient HTTP pipelines for:
 dotnet add package SYT.Fiskaly --prerelease
 ```
 
-## Quick Start (ASP.NET Core)
+## Configuration
 
-### 1) Configure credentials
+Minimum required settings:
 
 ```json
 {
@@ -39,7 +43,17 @@ dotnet add package SYT.Fiskaly --prerelease
 }
 ```
 
-### 2) Register SDK in DI
+Optional per-client overrides are available under:
+- `Fiskaly:AuthClient`
+- `Fiskaly:AdminClient`
+- `Fiskaly:TssClient`
+- `Fiskaly:TransactionClient`
+- `Fiskaly:ExportClient`
+- `Fiskaly:ClientManagementClient`
+- `Fiskaly:OrganizationClient`
+- `Fiskaly:ApiKeyClient`
+
+## Registration
 
 ```csharp
 using SYT.Fiskaly;
@@ -47,7 +61,7 @@ using SYT.Fiskaly;
 builder.Services.AddFiskaly(builder.Configuration);
 ```
 
-### 3) Resolve and use typed clients
+## Quick Start
 
 ```csharp
 using SYT.Fiskaly.SignDE.Tss;
@@ -60,12 +74,42 @@ var created = await tssClient.CreateTssAsync(tssId, cancellationToken: ct);
 Console.WriteLine($"Created TSS: {created.Id}");
 ```
 
-## Real Transaction Flow (Production Pattern)
+## Control Plane Example
 
-This is a production-ready signing pattern:
-1. Start transaction (`ACTIVE`)
-2. Build payload (`Receipt`)
-3. Finish transaction (`FINISHED`)
+This is the recommended pattern for control-plane services that create managed organizations,
+issue runtime API keys, and then operate in the scope of those runtime credentials.
+
+```csharp
+using SYT.Fiskaly.Authentication;
+using SYT.Fiskaly.Authentication.Credentials;
+using SYT.Fiskaly.Authentication.ValueObjects;
+using SYT.Fiskaly.Management.ApiKeys;
+using SYT.Fiskaly.Management.ApiKeys.Requests;
+using SYT.Fiskaly.Management.Organizations;
+
+IOrganizationClient organizations = sp.GetRequiredService<IOrganizationClient>();
+IApiKeyClient apiKeys = sp.GetRequiredService<IApiKeyClient>();
+IFiskalyCredentialScopeFactory scopes = sp.GetRequiredService<IFiskalyCredentialScopeFactory>();
+
+OrganizationId organizationId = OrganizationId.From("9b8ad703-b85c-4dec-882d-2dc7525ada3f");
+
+var createdKey = await apiKeys.CreateApiKeyAsync(
+    organizationId,
+    new CreateApiKeyRequest
+    {
+        Name = "runtime-berlin-register-01"
+    },
+    ct);
+
+using IDisposable scope = scopes.BeginScope(new ApiKeyCredentials(
+    ApiKey.From(createdKey.Key ?? throw new InvalidOperationException("API key was not returned.")),
+    ApiSecret.From(createdKey.Secret ?? throw new InvalidOperationException("API secret was not returned."))));
+
+var runtimeOrganization = await organizations.GetOrganizationAsync(organizationId, ct);
+Console.WriteLine($"Scoped organization lookup: {runtimeOrganization.Name}");
+```
+
+## SIGN DE Transaction Example
 
 ```csharp
 using SYT.Fiskaly.SignDE.Clients.ValueObjects;
@@ -77,20 +121,16 @@ using SYT.Fiskaly.SignDE.Transactions.Schemas;
 using SYT.Fiskaly.SignDE.Transactions.ValueObjects;
 using SYT.Fiskaly.SignDE.Tss.ValueObjects;
 
-ITransactionClient transactionClient = serviceProvider.GetRequiredService<ITransactionClient>();
+ITransactionClient transactionClient = sp.GetRequiredService<ITransactionClient>();
 
 TssId tssId = TssId.From("d9ee9052-fd45-4846-af24-818d10353cdb");
 ClientId clientId = ClientId.From("0d918f2a-3c47-4662-a665-8e565d61109b");
 TxId txId = TxId.New();
 
-MetadataCollection metadata = MetadataCollection.Empty
-    .Add("order_id", "ORD-2026-000123")
-    .Add("cashpoint", "POS-01");
-
 StartTransactionRequest start = new()
 {
     ClientId = clientId,
-    Metadata = metadata
+    Metadata = MetadataCollection.Empty.Add("cashpoint", "POS-01")
 };
 
 _ = await transactionClient.StartTransactionAsync(tssId, txId, start, ct);
@@ -116,117 +156,32 @@ Receipt receipt = new()
     ]
 };
 
-FinishTransactionRequest finish = FinishTransactionRequest.CreateReceipt(clientId, receipt, metadata);
-var finished = await transactionClient.FinishTransactionAsync(tssId, txId, finish, cancellationToken: ct);
+FinishTransactionRequest finish = FinishTransactionRequest.CreateReceipt(
+    clientId,
+    receipt,
+    MetadataCollection.Empty.Add("cashpoint", "POS-01"));
 
+var finished = await transactionClient.FinishTransactionAsync(tssId, txId, finish, ct);
 Console.WriteLine($"Tx finished: {finished.Id}, qr={finished.QrCodeData}");
 ```
 
-## TSS + Client Setup Example
+## TEST and LIVE Environments
 
-```csharp
-using SYT.Fiskaly.SignDE.Clients;
-using SYT.Fiskaly.SignDE.Clients.Requests;
-using SYT.Fiskaly.SignDE.Clients.ValueObjects;
-using SYT.Fiskaly.SignDE.Common;
-using SYT.Fiskaly.SignDE.Tss;
-using SYT.Fiskaly.SignDE.Tss.Requests;
-using SYT.Fiskaly.SignDE.Tss.ValueObjects;
+- Fiskaly API keys are organization-scoped and environment-scoped.
+- `TEST` and `LIVE` are separate operational environments.
+- New managed organizations are typically provisioned and exercised in `TEST` first.
+- Moving to `LIVE` is an explicit Management API and operational step. It is not an automatic `TEST -> LIVE` promotion.
+- Runtime services should use credentials issued for the exact target organization and environment.
 
-ITssClient tssClient = sp.GetRequiredService<ITssClient>();
-IClientManagementClient clientClient = sp.GetRequiredService<IClientManagementClient>();
+## Validation Rules
 
-TssId tssId = TssId.New();
-ClientId clientId = ClientId.New();
+- `Fiskaly:ApiKey` is required.
+- `Fiskaly:ApiSecret` must be exactly 43 alphanumeric characters.
+- `BaseUrl` and `ManagementBaseUrl` must be absolute and end with `/`.
+- HTTPS is required by default.
+- HTTP is allowed only for localhost, or private networks when `AllowHttpForPrivateNetworks=true`.
 
-MetadataCollection tssMetadata = MetadataCollection.Empty.Add("cashpoint", "POS-01");
-
-_ = await tssClient.CreateTssAsync(tssId, tssMetadata, ct);
-_ = await tssClient.UpdateTssAsync(tssId, UpdateTssRequest.Initialize("Main terminal", tssMetadata), ct);
-
-CreateClientRequest createClient = new()
-{
-    SerialNumber = ClientSerialNumber.From("POS-01"),
-    Metadata = MetadataCollection.Empty.Add("location", "Berlin")
-};
-
-_ = await clientClient.CreateClientAsync(tssId, clientId, createClient, ct);
-```
-
-## Export Example (Trigger -> Poll -> Download)
-
-```csharp
-using SYT.Fiskaly.SignDE.Exports;
-using SYT.Fiskaly.SignDE.Exports.Enums;
-using SYT.Fiskaly.SignDE.Exports.Models;
-using SYT.Fiskaly.SignDE.Exports.ValueObjects;
-using SYT.Fiskaly.SignDE.Tss.ValueObjects;
-
-IExportClient exportClient = sp.GetRequiredService<IExportClient>();
-
-TssId tssId = TssId.From("d9ee9052-fd45-4846-af24-818d10353cdb");
-ExportId exportId = ExportId.New();
-
-DsfinvkFullExportRequest request = new()
-{
-    StartDate = DateTimeOffset.UtcNow.AddDays(-1),
-    EndDate = DateTimeOffset.UtcNow,
-    MaximumNumberRecords = ExportLimit.From(10_000)
-};
-
-ExportJob job = await exportClient.TriggerFullExportAsync(tssId, exportId, request, ct);
-
-while (job.State is ExportState.Pending or ExportState.Working)
-{
-    await Task.Delay(TimeSpan.FromSeconds(2), ct);
-    job = await exportClient.GetExportAsync(tssId, exportId, ct);
-}
-
-if (job.State != ExportState.Completed)
-{
-    throw new InvalidOperationException($"Export failed. State={job.State}, Exception={job.ExceptionCode}");
-}
-
-var archive = await exportClient.DownloadExportAsync(tssId, exportId, cancellationToken: ct);
-Console.WriteLine($"Downloaded export with {archive.Segments.Count} segment(s)");
-```
-
-## Authentication + Management API Example
-
-```csharp
-using SYT.Fiskaly.Authentication;
-using SYT.Fiskaly.Authentication.Credentials;
-using SYT.Fiskaly.Authentication.ValueObjects;
-using SYT.Fiskaly.Management.Organizations;
-
-IFiskalyAuthenticationService auth = sp.GetRequiredService<IFiskalyAuthenticationService>();
-IOrganizationClient organizations = sp.GetRequiredService<IOrganizationClient>();
-
-ApiKeyCredentials credentials = new(
-    ApiKey.From("test_your_api_key"),
-    ApiSecret.From("your_43_char_api_secret"));
-
-var authResponse = await auth.AuthenticateAsync(credentials, ct);
-var organizationId = authResponse.Claims?.OrganizationId
-    ?? throw new InvalidOperationException("Organization ID is missing in auth claims.");
-
-var organization = await organizations.GetOrganizationAsync(organizationId, ct);
-Console.WriteLine($"Organization: {organization.Name}");
-```
-
-## Configuration Reference
-
-Minimum required settings:
-- `Fiskaly:ApiKey`
-- `Fiskaly:ApiSecret`
-
-Important validation rules:
-- `BaseUrl` and `ManagementBaseUrl` must be absolute and end with `/`
-- HTTPS is required by default
-- HTTP is allowed only for localhost (or private LAN when `AllowHttpForPrivateNetworks=true`)
-- `ApiSecret` must be exactly 43 alphanumeric characters
-
-### Per-client default resilience profile
+## Default Resilience Profiles
 
 | Client | Timeout (s) | RetryCount | CircuitBreakerThreshold | CircuitBreakerDuration (s) |
 |---|---:|---:|---:|---:|
@@ -237,8 +192,9 @@ Important validation rules:
 | `ExportClient` | 120 | 2 | 3 | 240 |
 | `ClientManagementClient` | 30 | 3 | 5 | 60 |
 | `OrganizationClient` | 30 | 3 | 5 | 60 |
+| `ApiKeyClient` | 30 | 3 | 5 | 60 |
 
-### Runtime override in code
+## Runtime Override in Code
 
 ```csharp
 using SYT.Fiskaly;
@@ -247,119 +203,13 @@ using SYT.Fiskaly.Configuration;
 builder.Services.AddFiskaly(builder.Configuration, configure: cfg =>
 {
     cfg.TransactionClient.UseHighResilience();
-    cfg.AuthClient.DisableResilience();
+    cfg.ApiKeyClient.DisableResilience();
 });
 ```
 
-## Error Handling Best Practices
+## Error Handling
 
-Production usage maps SDK exceptions to domain errors:
-- `FiskalyApiException`: HTTP/API error with code/category/details
-- `FiskalyTimeoutException`: request timeout
-- `FiskalyException`: generic SDK-level failure
-
-```csharp
-using SYT.Fiskaly.Exceptions;
-
-try
-{
-    await transactionClient.StartTransactionAsync(tssId, txId, start, ct);
-}
-catch (FiskalyApiException ex) when (ex.IsRetryable)
-{
-    logger.LogWarning(
-        "Retryable API error. Status={Status}, Code={Code}, Correlation={CorrelationId}",
-        ex.StatusCode,
-        ex.ErrorCode,
-        ex.CorrelationId);
-    throw;
-}
-catch (FiskalyApiException ex)
-{
-    logger.LogError(
-        "API error. Status={Status}, Code={Code}, Category={Category}, Hint={Hint}",
-        ex.StatusCode,
-        ex.ErrorCode,
-        ex.Category,
-        ex.GetRecoveryHint());
-    throw;
-}
-catch (FiskalyTimeoutException ex)
-{
-    logger.LogWarning(ex, "Fiskaly timeout");
-    throw;
-}
-```
-
-## Metadata Rules
-
-`MetadataCollection` is immutable and validated:
-- max 40 entries
-- max key length: 40
-- max value length: 500
-
-```csharp
-MetadataCollection metadata = MetadataCollection.Empty
-    .Add("order_id", "ORD-123")
-    .Add("cashier", "alice");
-```
-
-For merge-style metadata updates, send only changed keys.
-In Fiskaly APIs that support remove-on-empty semantics, deleted keys can be sent with empty string.
-
-## Integration Tests
-
-`SYT.Fiskaly.IntegrationTests` loads configuration in this order:
-1. `appsettings.test.json` (tracked template)
-2. `appsettings.test.local.json` (local override, gitignored)
-
-Create local override:
-
-```bash
-cp tests/SYT.Fiskaly.IntegrationTests/appsettings.test.local.example.json \
-   tests/SYT.Fiskaly.IntegrationTests/appsettings.test.local.json
-```
-
-Put real credentials only into `appsettings.test.local.json`.
-
-## Troubleshooting
-
-### Retryable API errors (5xx / transient)
-
-The SDK marks transient API failures as retryable and applies resilient retry policy.
-If it still fails after retries:
-- wait and retry
-- verify there is no conflicting process on the same fiscal resources
-- review your timeout/retry configuration for the affected client
-
-### `401 Unauthorized`
-
-- verify `ApiKey` and `ApiSecret`
-- check environment mismatch (test vs production credentials/base URL)
-
-### Configuration validation errors at startup
-
-- ensure URL values are absolute and end with `/`
-- ensure `ApiSecret` length/format is valid
-
-### Missing `admin_puk`
-
-`admin_puk` is returned only once when creating a TSS. Persist it immediately if your flow needs it.
-
-## Security Notes
-
-- Never commit real credentials.
-- Use user-secrets, environment variables, CI secret stores, or vaults.
-- Prefer least-privilege runtime identities.
-- Be careful with verbose logs in development (`sensitive data logging` can expose payloads).
-
-## Maintainer
-
-|  |  |
-|---|---|
-| ![Anatoliy Yermakov](https://raw.githubusercontent.com/i7aket/SYT.Fiskaly/main/src/SYT.Fiskaly/docs/images/anatoliy-yermakov.jpeg) | Maintained and published by **Anatoliy Yermakov** for the **SYT open-source community**. This package is publicly available for any team or developer who needs a robust .NET Fiskaly integration. |
-
-## Official References
-
-- Fiskaly docs: https://developer.fiskaly.com
-- SIGN DE API: https://developer.fiskaly.com/api/sign-de
+Production usage typically maps SDK exceptions to domain-level failures:
+- `FiskalyApiException`
+- `FiskalyTimeoutException`
+- `FiskalyException`

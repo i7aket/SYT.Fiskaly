@@ -1,7 +1,10 @@
 using System.Text.Json;
 using SYT.Fiskaly.Authentication.ValueObjects;
+using SYT.Fiskaly.Common.Enums;
 using SYT.Fiskaly.Http;
+using SYT.Fiskaly.Management.Common.Responses;
 using SYT.Fiskaly.Management.Organizations.Models;
+using SYT.Fiskaly.Management.Organizations.Requests;
 using SYT.Fiskaly.Management.Organizations.Responses;
 using SYT.Fiskaly.SignDE.Common;
 
@@ -57,5 +60,79 @@ public partial class OrganizationClient(
             retrievedId, retrievedName);
 
         return organization;
+    }
+
+    public async Task<OrganizationResponse> CreateOrganizationAsync(
+        CreateOrganizationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        _logger.LogInformation("Creating organization {Name}", request.Name);
+
+        OrganizationResponse organization = await _executor.ExecutePostAsync<CreateOrganizationRequest, OrganizationResponse>(
+            _httpClient,
+            "organizations",
+            request,
+            cancellationToken).ConfigureAwait(false);
+
+        _logger.LogInformation(
+            "Created organization {OrganizationId} with name {Name}",
+            organization.Id?.Value,
+            organization.Name ?? request.Name);
+
+        return organization;
+    }
+
+    public async Task<OrganizationResponse> UpdateOrganizationAsync(
+        OrganizationId organizationId,
+        UpdateOrganizationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        _logger.LogInformation("Updating organization {OrganizationId}", organizationId.Value);
+
+        OrganizationResponse organization = await _executor.ExecutePatchAsync<UpdateOrganizationRequest, OrganizationResponse>(
+            _httpClient,
+            $"organizations/{organizationId}",
+            request,
+            cancellationToken).ConfigureAwait(false);
+
+        _logger.LogInformation(
+            "Updated organization {OrganizationId}, Name: {Name}",
+            organization.Id?.Value ?? organizationId.Value,
+            organization.Name ?? "(unknown)");
+
+        return organization;
+    }
+
+    public async Task<StatusResponse> EnableEnvironmentAsync(
+        OrganizationId organizationId,
+        Env env,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Enabling environment {Environment} for organization {OrganizationId}",
+            env,
+            organizationId.Value);
+
+        return await _executor.ExecutePostAsync<EnableOrganizationEnvironmentRequest, StatusResponse>(
+            _httpClient,
+            $"organizations/{organizationId}/enable-env",
+            new EnableOrganizationEnvironmentRequest { Env = env },
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<StatusResponse> DeleteOrganizationAsync(
+        OrganizationId organizationId,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning("Deleting organization {OrganizationId}", organizationId.Value);
+
+        return await _executor.ExecuteDeleteAsync<StatusResponse>(
+            _httpClient,
+            $"organizations/{organizationId}",
+            cancellationToken).ConfigureAwait(false);
     }
 }

@@ -1,9 +1,9 @@
 using System.Text.Json.Serialization;
 using SYT.Fiskaly.Authentication.ValueObjects;
+using SYT.Fiskaly.Common.Enums;
 using SYT.Fiskaly.Management.Common.Enums;
 using SYT.Fiskaly.Management.Organizations.Models;
 using SYT.Fiskaly.SignDE.Common;
-using SYT.Fiskaly.SignDE.Common.Enums;
 
 namespace SYT.Fiskaly.Management.Organizations.Responses;
 

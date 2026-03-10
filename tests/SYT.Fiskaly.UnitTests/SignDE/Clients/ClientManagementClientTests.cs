@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.Protected;
 using SYT.Fiskaly.Http;
-using SYT.Fiskaly.SignDE.Common.Enums;
+using SYT.Fiskaly.Common.Enums;
 using SYT.Fiskaly.SignDE.Clients;
 using SYT.Fiskaly.SignDE.Clients.Enums;
 using SYT.Fiskaly.SignDE.Clients.Requests;

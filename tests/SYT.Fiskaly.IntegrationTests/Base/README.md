@@ -46,6 +46,10 @@ cp tests/SYT.Fiskaly.IntegrationTests/appsettings.test.local.example.json \
 
 Fill real Fiskaly credentials only in `appsettings.test.local.json`.
 
+`FiskalyBase` is optional. When it is missing, `FiskalyBaseTestFixture` falls back to the
+default `Fiskaly` section. Add `FiskalyBase` only if you explicitly want a separate API key
+for the base integration suite.
+
 ## Architecture
 
 ### Minimal State Pattern

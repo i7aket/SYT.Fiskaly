@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-using SYT.Fiskaly.SignDE.Common.Enums;
+using SYT.Fiskaly.Common.Enums;
 
 namespace SYT.Fiskaly.SignDE.Clients.Responses;
 

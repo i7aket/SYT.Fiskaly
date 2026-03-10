@@ -5,7 +5,7 @@ using SYT.Fiskaly.Management.Common.Enums;
 using SYT.Fiskaly.Management.Organizations.Models;
 using SYT.Fiskaly.Management.Organizations.Responses;
 using SYT.Fiskaly.SignDE.Common;
-using SYT.Fiskaly.SignDE.Common.Enums;
+using SYT.Fiskaly.Common.Enums;
 using Xunit.Abstractions;
 
 namespace SYT.Fiskaly.IntegrationTests.Management;

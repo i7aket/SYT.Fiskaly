@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace SYT.Fiskaly.SignDE.Common.Enums;
+namespace SYT.Fiskaly.Common.Enums;
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum Algorithm

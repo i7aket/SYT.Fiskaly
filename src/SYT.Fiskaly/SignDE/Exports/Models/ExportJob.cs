@@ -1,9 +1,9 @@
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 using SYT.Fiskaly.Common;
+using SYT.Fiskaly.Common.Enums;
 using SYT.Fiskaly.SignDE.Clients.ValueObjects;
 using SYT.Fiskaly.SignDE.Common;
-using SYT.Fiskaly.SignDE.Common.Enums;
 using SYT.Fiskaly.SignDE.Exports.Enums;
 using SYT.Fiskaly.SignDE.Exports.ValueObjects;
 using SYT.Fiskaly.SignDE.Tss.ValueObjects;

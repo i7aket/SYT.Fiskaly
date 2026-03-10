@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SYT.Fiskaly;
 using SYT.Fiskaly.Configuration;
+using SYT.Fiskaly.Management.ApiKeys;
+using SYT.Fiskaly.Management.Organizations;
 using SYT.Fiskaly.SignDE.Admin;
 using SYT.Fiskaly.SignDE.Clients;
 using SYT.Fiskaly.SignDE.Exports;
@@ -81,12 +83,14 @@ public class FiskalyConfigurationTests
 
         ServiceProvider serviceProvider = services.BuildServiceProvider();
 
-        // Act & Assert: All 5 clients can be resolved
+        // Act & Assert: All 7 clients can be resolved
         Assert.NotNull(serviceProvider.GetRequiredService<IAdminClient>());
         Assert.NotNull(serviceProvider.GetRequiredService<ITssClient>());
         Assert.NotNull(serviceProvider.GetRequiredService<IClientManagementClient>());
         Assert.NotNull(serviceProvider.GetRequiredService<ITransactionClient>());
         Assert.NotNull(serviceProvider.GetRequiredService<IExportClient>());
+        Assert.NotNull(serviceProvider.GetRequiredService<IOrganizationClient>());
+        Assert.NotNull(serviceProvider.GetRequiredService<IApiKeyClient>());
     }
 
     [Trait("Category", "Unit")]

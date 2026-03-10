@@ -6,9 +6,10 @@
     <Nullable>enable</Nullable>
 
     <!-- Versioning -->
-    <Version>1.0.0-rc.1</Version>
+    <Version>1.0.0-rc.2</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0-rc.2</InformationalVersion>
 
     <!-- Package Metadata -->
     <PackageId>SYT.Fiskaly</PackageId>
@@ -19,16 +20,19 @@
     <PackageProjectUrl>https://github.com/i7aket/SYT.Fiskaly</PackageProjectUrl>
     <RepositoryUrl>https://github.com/i7aket/SYT.Fiskaly.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>fiskaly;sign-de;kassensichv;dotnet;sdk;pos</PackageTags>
     <PackageReleaseNotes>
-Release candidate for the first public NuGet publication.
+Release candidate for Management API control-plane support.
 
 Highlights:
-- cleaned public documentation
-- removed embedded integration credentials
-- prepared repository for public open-source distribution
+- added Management API write support for organizations and API keys
+- added scoped credentials for per-organization execution
+- added typed API key query models and resilient identifier deserialization
+- strengthened unit and integration coverage for the new surface
     </PackageReleaseNotes>
   </PropertyGroup>
 
@@ -50,6 +54,7 @@ Highlights:
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="icon.png" Pack="true" PackagePath="\" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

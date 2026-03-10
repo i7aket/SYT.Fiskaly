@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Moq.Protected;
 using SYT.Fiskaly.Authentication;
+using SYT.Fiskaly.Authentication.Credentials;
+using SYT.Fiskaly.Authentication.ValueObjects;
 using SYT.Fiskaly.Handlers;
 
 namespace SYT.Fiskaly.UnitTests.Handlers;
@@ -15,6 +17,7 @@ namespace SYT.Fiskaly.UnitTests.Handlers;
 public class JwtAuthHandlerTests : IDisposable
 {
     private readonly Mock<IFiskalyAuthenticationService> _authServiceMock;
+    private readonly Mock<IFiskalyCredentialScopeFactory> _credentialScopeFactoryMock;
     private readonly ILogger<JwtAuthHandler> _logger;
     private readonly Mock<HttpMessageHandler> _innerHandlerMock;
     private readonly JwtAuthHandler _handler;
@@ -23,10 +26,12 @@ public class JwtAuthHandlerTests : IDisposable
     public JwtAuthHandlerTests()
     {
         _authServiceMock = new Mock<IFiskalyAuthenticationService>();
+        _credentialScopeFactoryMock = new Mock<IFiskalyCredentialScopeFactory>();
         _logger = NullLogger<JwtAuthHandler>.Instance;
         _innerHandlerMock = new Mock<HttpMessageHandler>();
+        _credentialScopeFactoryMock.SetupGet(x => x.Current).Returns((IFiskalyCredentials?)null);
 
-        _handler = new JwtAuthHandler(_authServiceMock.Object, _logger);
+        _handler = new JwtAuthHandler(_authServiceMock.Object, _credentialScopeFactoryMock.Object, _logger);
         _handler.InnerHandler = _innerHandlerMock.Object;
 
         _invoker = new HttpMessageInvoker(_handler);
@@ -45,7 +50,7 @@ public class JwtAuthHandlerTests : IDisposable
     public void Constructor_WithValidDependencies_DoesNotThrow()
     {
         // Arrange & Act
-        JwtAuthHandler handler = new JwtAuthHandler(_authServiceMock.Object, _logger);
+        JwtAuthHandler handler = new JwtAuthHandler(_authServiceMock.Object, _credentialScopeFactoryMock.Object, _logger);
 
         // Assert
         Assert.NotNull(handler);
@@ -57,7 +62,7 @@ public class JwtAuthHandlerTests : IDisposable
     {
         // Act & Assert
         ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
-            new JwtAuthHandler(null!, _logger));
+            new JwtAuthHandler(null!, _credentialScopeFactoryMock.Object, _logger));
 
         Assert.Equal("authService", exception.ParamName);
     }
@@ -68,7 +73,7 @@ public class JwtAuthHandlerTests : IDisposable
     {
         // Act & Assert
         ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
-            new JwtAuthHandler(_authServiceMock.Object, null!));
+            new JwtAuthHandler(_authServiceMock.Object, _credentialScopeFactoryMock.Object, null!));
 
         Assert.Equal("logger", exception.ParamName);
     }
@@ -253,6 +258,43 @@ public class JwtAuthHandlerTests : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => _invoker.SendAsync(request, cts.Token));
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public async Task SendAsync_WhenCredentialScopeIsActive_UsesScopedCredentials()
+    {
+        // Arrange
+        ApiKeyCredentials scopedCredentials = new(
+            ApiKey.From("test_scoped_key"),
+            ApiSecret.From("1234567890123456789012345678901234567890123"));
+
+        _credentialScopeFactoryMock.SetupGet(x => x.Current).Returns(scopedCredentials);
+
+        _authServiceMock
+            .Setup(x => x.GetAccessTokenAsync(scopedCredentials, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("scoped_token");
+
+        _innerHandlerMock
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK));
+
+        HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "https://api.fiskaly.com/test");
+
+        // Act
+        await _invoker.SendAsync(request, CancellationToken.None);
+
+        // Assert
+        _authServiceMock.Verify(
+            x => x.GetAccessTokenAsync(scopedCredentials, It.IsAny<CancellationToken>()),
+            Times.Once);
+        _authServiceMock.Verify(
+            x => x.GetAccessTokenAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+        Assert.Equal("scoped_token", request.Headers.Authorization?.Parameter);
     }
 
     [Trait("Category", "Unit")]

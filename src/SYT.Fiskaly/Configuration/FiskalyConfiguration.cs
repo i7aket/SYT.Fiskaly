@@ -85,4 +85,12 @@ public class FiskalyConfiguration
         CircuitBreakerThreshold = 5,
         CircuitBreakerDurationSeconds = 60  // Must be >= 2 * TimeoutSeconds (Microsoft.Extensions.Http.Resilience requirement)
     };
+
+    public FiskalyClientConfiguration ApiKeyClient { get; set; } = new()
+    {
+        TimeoutSeconds = 30,
+        RetryCount = 3,
+        CircuitBreakerThreshold = 5,
+        CircuitBreakerDurationSeconds = 60  // Must be >= 2 * TimeoutSeconds (Microsoft.Extensions.Http.Resilience requirement)
+    };
 }

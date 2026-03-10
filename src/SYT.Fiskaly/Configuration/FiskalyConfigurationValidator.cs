@@ -82,6 +82,7 @@ public sealed class FiskalyConfigurationValidator : IValidateOptions<FiskalyConf
         ValidateClient(options.ExportClient, "ExportClient", errors);
         ValidateClient(options.ClientManagementClient, "ClientManagementClient", errors);
         ValidateClient(options.OrganizationClient, "OrganizationClient", errors);
+        ValidateClient(options.ApiKeyClient, "ApiKeyClient", errors);
 
         return errors.Count == 0
             ? ValidateOptionsResult.Success

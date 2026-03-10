@@ -4,17 +4,21 @@ namespace SYT.Fiskaly.Handlers;
 
 internal sealed class JwtAuthHandler(
     IFiskalyAuthenticationService authService,
+    IFiskalyCredentialScopeFactory credentialScopeFactory,
     ILogger<JwtAuthHandler> logger)
     : DelegatingHandler
 {
     private readonly IFiskalyAuthenticationService _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+    private readonly IFiskalyCredentialScopeFactory _credentialScopeFactory = credentialScopeFactory ?? throw new ArgumentNullException(nameof(credentialScopeFactory));
     private readonly ILogger<JwtAuthHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        string token = await _authService.GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
+        string token = _credentialScopeFactory.Current is { } overriddenCredentials
+            ? await _authService.GetAccessTokenAsync(overriddenCredentials, cancellationToken).ConfigureAwait(false)
+            : await _authService.GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
 
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 

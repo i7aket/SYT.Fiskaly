@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using RichardSzalay.MockHttp;
 using SYT.Fiskaly.Http;
-using SYT.Fiskaly.SignDE.Common.Enums;
+using SYT.Fiskaly.Common.Enums;
 using SYT.Fiskaly.SignDE.Tss.Responses;
 using SYT.Fiskaly.SignDE.Tss.ValueObjects;
 using SYT.Fiskaly.SignDE.Tss.Enums;

@@ -1,11 +1,15 @@
 using SYT.Fiskaly.Authentication.ValueObjects;
+using SYT.Fiskaly.Common.Enums;
+using SYT.Fiskaly.Management.Common.Responses;
 using SYT.Fiskaly.Management.Organizations.Models;
+using SYT.Fiskaly.Management.Organizations.Requests;
 using SYT.Fiskaly.Management.Organizations.Responses;
 
 namespace SYT.Fiskaly.Management.Organizations;
 
 /// <summary>
-/// Read-only wrapper for Management API organization endpoints (fiskaly-management-api-spec-v0.12.0).
+/// Wrapper for Management API organization endpoints (fiskaly-management-api-spec-v0.12.0).
+/// Supports read and write operations for organization lifecycle management.
 /// </summary>
 public interface IOrganizationClient
 {
@@ -26,6 +30,36 @@ public interface IOrganizationClient
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The OrganizationResponse from the Management API.</returns>
     Task<OrganizationResponse> GetOrganizationAsync(
+        OrganizationId organizationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Calls POST /organizations.
+    /// </summary>
+    Task<OrganizationResponse> CreateOrganizationAsync(
+        CreateOrganizationRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Calls PATCH /organizations/{organization_id}.
+    /// </summary>
+    Task<OrganizationResponse> UpdateOrganizationAsync(
+        OrganizationId organizationId,
+        UpdateOrganizationRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Calls POST /organizations/{organization_id}/enable-env.
+    /// </summary>
+    Task<StatusResponse> EnableEnvironmentAsync(
+        OrganizationId organizationId,
+        Env env,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Calls DELETE /organizations/{organization_id}.
+    /// </summary>
+    Task<StatusResponse> DeleteOrganizationAsync(
         OrganizationId organizationId,
         CancellationToken cancellationToken = default);
 }

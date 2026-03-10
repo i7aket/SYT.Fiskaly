@@ -20,6 +20,7 @@ using SYT.Fiskaly.SignDE.Exports.Dsfinvk;
 using SYT.Fiskaly.SignDE.Transactions;
 using SYT.Fiskaly.SignDE.Transactions.Serialization;
 using SYT.Fiskaly.SignDE.Tss;
+using SYT.Fiskaly.Management.ApiKeys;
 using SYT.Fiskaly.Management.Organizations;
 
 namespace SYT.Fiskaly;
@@ -95,6 +96,7 @@ public static class ServiceCollectionExtensions
             .AddHttpMessageHandler<FiskalyErrorHandler>();
 
         services.AddSingleton<IFiskalyAuthenticationService, FiskalyAuthenticationService>();
+        services.AddSingleton<IFiskalyCredentialScopeFactory, FiskalyCredentialScopeFactory>();
 
         services.AddTransient<JwtAuthHandler>();
 
@@ -124,6 +126,8 @@ public static class ServiceCollectionExtensions
 
         services.AddFiskalyManagementClient<IOrganizationClient, OrganizationClient>(
             "OrganizationClient", cfg => cfg.OrganizationClient);
+        services.AddFiskalyManagementClient<IApiKeyClient, ApiKeyClient>(
+            "ApiKeyClient", cfg => cfg.ApiKeyClient);
 
         #endregion API Clients
 
@@ -153,6 +157,17 @@ public static class ServiceCollectionExtensions
     {
         return builder
             .AddHttpMessageHandler<FiskalyBaseUrlHandler>()
+            .AddHttpMessageHandler<JwtAuthHandler>()
+            .AddFiskalyResilience(clientName, configSelector)
+            .AddHttpMessageHandler<FiskalyErrorHandler>();
+    }
+
+    private static IHttpClientBuilder AddFiskalyManagementPipeline(
+        this IHttpClientBuilder builder,
+        string clientName,
+        Func<FiskalyConfiguration, FiskalyClientConfiguration> configSelector)
+    {
+        return builder
             .AddHttpMessageHandler<JwtAuthHandler>()
             .AddFiskalyResilience(clientName, configSelector)
             .AddHttpMessageHandler<FiskalyErrorHandler>();
@@ -189,8 +204,7 @@ public static class ServiceCollectionExtensions
     {
         return services
             .AddHttpClient<TClient, TImplementation>(ConfigureFiskalyManagementHttpClient)
-            .AddHttpMessageHandler<FiskalyManagementBaseUrlHandler>()
-            .AddFiskalyPipeline(clientName, configSelector);
+            .AddFiskalyManagementPipeline(clientName, configSelector);
     }
 
     private static void AddFiskalyScopedClient<TInterface, TImplementation>(

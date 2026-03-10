@@ -1,7 +1,7 @@
 using SYT.Fiskaly.Authentication.ValueObjects;
 using SYT.Fiskaly.Management.Common.Enums;
 using SYT.Fiskaly.Management.Organizations.Models;
-using SYT.Fiskaly.SignDE.Common.Enums;
+using SYT.Fiskaly.Common.Enums;
 
 namespace SYT.Fiskaly.UnitTests.Management.Organizations.Models;
 

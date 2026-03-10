@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SYT.Fiskaly;
+using SYT.Fiskaly.Management.ApiKeys;
 using SYT.Fiskaly.Management.Organizations;
 using SYT.Fiskaly.SignDE.Admin;
 using SYT.Fiskaly.SignDE.Clients;
@@ -19,7 +20,7 @@ namespace SYT.Fiskaly.IntegrationTests.Base;
 /// <para><strong>Fixture Responsibilities:</strong></para>
 /// <list type="bullet">
 ///   <item>Load configuration from appsettings.test.json (FiskalyConfiguration + FiskalyTestConfiguration)</item>
-///   <item>Register 5 segregated Fiskaly clients with automatic JWT authentication</item>
+///   <item>Register segregated Fiskaly clients with automatic JWT authentication</item>
 ///   <item>Set up SharedTss in INITIALIZED state (CREATED → INITIALIZED)</item>
 ///   <item>Register SharedClient on SharedTss for use by tests</item>
 ///   <item>Provide test resources (TSS IDs, Admin PUKs, Admin PIN) to all tests</item>
@@ -32,7 +33,8 @@ namespace SYT.Fiskaly.IntegrationTests.Base;
 ///   <item><strong>ClientManagementClient</strong> - POS client registration and metadata</item>
 ///   <item><strong>TransactionClient</strong> - Transaction operations (start, update, finish, cancel)</item>
 ///   <item><strong>ExportClient</strong> - Export operations (create, trigger, retrieve)</item>
-///   <item><strong>OrganizationClient</strong> - Management API organization operations (list, get)</item>
+///   <item><strong>OrganizationClient</strong> - Management API organization operations</item>
+///   <item><strong>ApiKeyClient</strong> - Management API API key lifecycle operations</item>
 /// </list>
 ///
 /// <para><strong>Initialization Flow:</strong></para>
@@ -42,8 +44,8 @@ namespace SYT.Fiskaly.IntegrationTests.Base;
 ///   2. Register all Fiskaly services via AddFiskaly() extension method:
 ///      - IFiskalyAuthenticationService (JWT token management)
 ///      - JwtAuthHandler (automatic authentication for HTTP clients)
-///      - 6 segregated clients (AdminClient, TssClient, ClientManagementClient, TransactionClient, ExportClient, OrganizationClient)
-///   3. Resolve all 6 clients from DI container
+///      - 7 segregated clients (AdminClient, TssClient, ClientManagementClient, TransactionClient, ExportClient, OrganizationClient, ApiKeyClient)
+///   3. Resolve all 7 clients from DI container
 ///   4. Call InitializeSharedTssAsync():
 ///      a. Get current SharedTss state (via TssClient)
 ///      b. If CREATED → Set to UNINITIALIZED (via TssClient.SetTssStateAsync - internal method)
@@ -117,6 +119,11 @@ public class FiskalyClientFixture : IAsyncLifetime
     public IOrganizationClient OrganizationClient { get; private set; } = null!;
 
     /// <summary>
+    /// Gets the ApiKeyClient instance for testing Management API API key operations.
+    /// </summary>
+    public IApiKeyClient ApiKeyClient { get; private set; } = null!;
+
+    /// <summary>
     /// Gets or sets the test output helper for logging test results.
     /// </summary>
     public ITestOutputHelper? TestOutputHelper { get; set; }
@@ -154,6 +161,7 @@ public class FiskalyClientFixture : IAsyncLifetime
         TransactionClient = _serviceProvider.GetRequiredService<ITransactionClient>();
         ExportClient = _serviceProvider.GetRequiredService<IExportClient>();
         OrganizationClient = _serviceProvider.GetRequiredService<IOrganizationClient>();
+        ApiKeyClient = _serviceProvider.GetRequiredService<IApiKeyClient>();
 
         return Task.CompletedTask;
     }

@@ -7,7 +7,7 @@ using Moq;
 using Moq.Protected;
 using SYT.Fiskaly.Http;
 using SYT.Fiskaly.SignDE.Admin.ValueObjects;
-using SYT.Fiskaly.SignDE.Common.Enums;
+using SYT.Fiskaly.Common.Enums;
 using SYT.Fiskaly.SignDE.Tss;
 using SYT.Fiskaly.SignDE.Tss.Enums;
 using SYT.Fiskaly.SignDE.Tss.Models;

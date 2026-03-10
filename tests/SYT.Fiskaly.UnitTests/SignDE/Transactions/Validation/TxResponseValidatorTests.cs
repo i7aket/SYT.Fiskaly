@@ -1,5 +1,5 @@
 using SYT.Fiskaly.SignDE.Clients.ValueObjects;
-using SYT.Fiskaly.SignDE.Common.Enums;
+using SYT.Fiskaly.Common.Enums;
 using SYT.Fiskaly.SignDE.Transactions.Enums;
 using SYT.Fiskaly.SignDE.Transactions.Responses;
 using SYT.Fiskaly.SignDE.Transactions.Validation;
