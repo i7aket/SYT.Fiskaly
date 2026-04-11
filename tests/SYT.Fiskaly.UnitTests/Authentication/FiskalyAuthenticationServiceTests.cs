@@ -76,6 +76,21 @@ public class FiskalyAuthenticationServiceTests
 
     [Trait("Category", "Unit")]
     [Fact]
+    public async Task GetAccessTokenAsync_WithoutDefaultCredentials_ThrowsConfiguredException()
+    {
+        MockHttpMessageHandler mockHttp = new MockHttpMessageHandler();
+        FakeTimeProvider fakeTime = new FakeTimeProvider(new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero));
+
+        FiskalyAuthenticationService service = CreateService(mockHttp, fakeTime, includeDefaultCredentials: false);
+
+        FiskalyCredentialsNotConfiguredException exception = await Assert.ThrowsAsync<FiskalyCredentialsNotConfiguredException>(
+            () => service.GetAccessTokenAsync());
+
+        Assert.Contains("No default Fiskaly credentials are configured", exception.Message);
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
     public async Task AuthenticateAsync_ReturnsResponseAndUsesCache()
     {
         // Arrange
@@ -454,14 +469,15 @@ public class FiskalyAuthenticationServiceTests
 
     private static FiskalyAuthenticationService CreateService(
         MockHttpMessageHandler mockHttp,
-        FakeTimeProvider fakeTime)
+        FakeTimeProvider fakeTime,
+        bool includeDefaultCredentials = true)
     {
         MockHttpClientFactory httpClientFactory = new MockHttpClientFactory(mockHttp);
 
         FiskalyConfiguration config = new FiskalyConfiguration
         {
-            ApiKey = ValidApiKey,
-            ApiSecret = ValidApiSecret,
+            ApiKey = includeDefaultCredentials ? ValidApiKey : string.Empty,
+            ApiSecret = includeDefaultCredentials ? ValidApiSecret : string.Empty,
             BaseUrl = "https://kassensichv-middleware.fiskaly.com/api/v2/"
         };
 

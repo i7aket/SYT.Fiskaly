@@ -17,7 +17,7 @@ configuration validation for:
 ## Package
 
 - Package ID: `SYT.Fiskaly`
-- Current channel: `1.0.0-rc.2`
+- Current channel: `1.0.0-rc.3`
 - Target framework: `net10.0`
 - License: `MIT`
 - Repository: `https://github.com/i7aket/SYT.Fiskaly`
@@ -30,18 +30,20 @@ dotnet add package SYT.Fiskaly --prerelease
 
 ## Configuration
 
-Minimum required settings:
+Minimum infrastructure settings:
 
 ```json
 {
   "Fiskaly": {
-    "ApiKey": "test_your_api_key",
-    "ApiSecret": "your_43_char_api_secret",
     "BaseUrl": "https://kassensichv-middleware.fiskaly.com/api/v2/",
     "ManagementBaseUrl": "https://dashboard.fiskaly.com/api/v0/"
   }
 }
 ```
+
+Default `ApiKey` / `ApiSecret` are optional. Configure them only when the process should have a
+global fallback credential pair. If credentials are supplied later via
+`IFiskalyCredentialScopeFactory`, the SDK can start without default secrets.
 
 Optional per-client overrides are available under:
 - `Fiskaly:AuthClient`
@@ -175,8 +177,9 @@ Console.WriteLine($"Tx finished: {finished.Id}, qr={finished.QrCodeData}");
 
 ## Validation Rules
 
-- `Fiskaly:ApiKey` is required.
-- `Fiskaly:ApiSecret` must be exactly 43 alphanumeric characters.
+- `Fiskaly:ApiKey` and `Fiskaly:ApiSecret` are optional as a pair.
+- If one is configured, the other must also be configured.
+- When `Fiskaly:ApiSecret` is set, it must be exactly 43 alphanumeric characters.
 - `BaseUrl` and `ManagementBaseUrl` must be absolute and end with `/`.
 - HTTPS is required by default.
 - HTTP is allowed only for localhost, or private networks when `AllowHttpForPrivateNetworks=true`.
@@ -212,4 +215,9 @@ builder.Services.AddFiskaly(builder.Configuration, configure: cfg =>
 Production usage typically maps SDK exceptions to domain-level failures:
 - `FiskalyApiException`
 - `FiskalyTimeoutException`
+- `FiskalyCredentialsNotConfiguredException`
 - `FiskalyException`
+
+## Release Notes
+
+See [CHANGELOG.md](https://github.com/i7aket/SYT.Fiskaly/blob/main/CHANGELOG.md) for the current release history.

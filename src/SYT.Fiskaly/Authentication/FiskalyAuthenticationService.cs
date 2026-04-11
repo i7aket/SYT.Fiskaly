@@ -14,7 +14,7 @@ public class FiskalyAuthenticationService : IFiskalyAuthenticationService
     private readonly HttpClient _httpClient;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly ILogger<FiskalyAuthenticationService> _logger;
-    private readonly IFiskalyCredentials _defaultCredentials;
+    private readonly IFiskalyCredentials? _defaultCredentials;
     private readonly TimeProvider _timeProvider;
 
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new(StringComparer.Ordinal);
@@ -35,13 +35,17 @@ public class FiskalyAuthenticationService : IFiskalyAuthenticationService
 
         FiskalyConfiguration config = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
-        _defaultCredentials = new ApiKeyCredentials(
-            ApiKey.From(config.ApiKey),
-            ApiSecret.From(config.ApiSecret));
+        if (!string.IsNullOrWhiteSpace(config.ApiKey) &&
+            !string.IsNullOrWhiteSpace(config.ApiSecret))
+        {
+            _defaultCredentials = new ApiKeyCredentials(
+                ApiKey.From(config.ApiKey),
+                ApiSecret.From(config.ApiSecret));
+        }
     }
 
     public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken = default) =>
-        GetAccessTokenAsync(_defaultCredentials, cancellationToken);
+        GetAccessTokenAsync(GetDefaultCredentialsOrThrow(), cancellationToken);
 
     public async Task<string> GetAccessTokenAsync(
         IFiskalyCredentials credentials,
@@ -172,4 +176,7 @@ public class FiskalyAuthenticationService : IFiskalyAuthenticationService
         _locks.Clear();
         _tokenCache.Clear();
     }
+
+    private IFiskalyCredentials GetDefaultCredentialsOrThrow() =>
+        _defaultCredentials ?? throw new FiskalyCredentialsNotConfiguredException();
 }

@@ -15,23 +15,23 @@ public class FiskalyConfigurationValidatorTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void Validate_ApiKeyIsNull_ReturnsFailure()
+    public void Validate_ApiKeyAndApiSecretAreBothMissing_ReturnsSuccess()
     {
         // Arrange
         FiskalyConfiguration config = CreateValidConfiguration();
         config.ApiKey = null!;
+        config.ApiSecret = null!;
 
         // Act
         ValidateOptionsResult result = _validator.Validate(null, config);
 
         // Assert
-        Assert.True(result.Failed, "Validation should fail when ApiKey is null");
-        Assert.Contains("Fiskaly API Key is required", result.FailureMessage);
+        Assert.False(result.Failed, $"Validation should succeed when both credentials are absent. Errors: {result.FailureMessage}");
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void Validate_ApiKeyIsEmpty_ReturnsFailure()
+    public void Validate_ApiKeyIsEmptyWhileApiSecretExists_ReturnsFailure()
     {
         // Arrange
         FiskalyConfiguration config = CreateValidConfiguration();
@@ -41,13 +41,13 @@ public class FiskalyConfigurationValidatorTests
         ValidateOptionsResult result = _validator.Validate(null, config);
 
         // Assert
-        Assert.True(result.Failed, "Validation should fail when ApiKey is empty");
-        Assert.Contains("Fiskaly API Key is required", result.FailureMessage);
+        Assert.True(result.Failed, "Validation should fail when ApiSecret exists but ApiKey is empty");
+        Assert.Contains("Fiskaly API Key is required when 'Fiskaly:ApiSecret' is configured", result.FailureMessage);
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void Validate_ApiKeyIsWhitespace_ReturnsFailure()
+    public void Validate_ApiKeyIsWhitespaceWhileApiSecretExists_ReturnsFailure()
     {
         // Arrange
         FiskalyConfiguration config = CreateValidConfiguration();
@@ -57,8 +57,8 @@ public class FiskalyConfigurationValidatorTests
         ValidateOptionsResult result = _validator.Validate(null, config);
 
         // Assert
-        Assert.True(result.Failed, "Validation should fail when ApiKey is only whitespace");
-        Assert.Contains("Fiskaly API Key is required", result.FailureMessage);
+        Assert.True(result.Failed, "Validation should fail when ApiSecret exists but ApiKey is only whitespace");
+        Assert.Contains("Fiskaly API Key is required when 'Fiskaly:ApiSecret' is configured", result.FailureMessage);
     }
 
     [Trait("Category", "Unit")]
@@ -114,7 +114,7 @@ public class FiskalyConfigurationValidatorTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void Validate_ApiSecretIsNull_ReturnsFailure()
+    public void Validate_ApiSecretIsNullWhileApiKeyExists_ReturnsFailure()
     {
         // Arrange
         FiskalyConfiguration config = CreateValidConfiguration();
@@ -124,13 +124,13 @@ public class FiskalyConfigurationValidatorTests
         ValidateOptionsResult result = _validator.Validate(null, config);
 
         // Assert
-        Assert.True(result.Failed, "Validation should fail when ApiSecret is null");
-        Assert.Contains("Fiskaly API Secret is required", result.FailureMessage);
+        Assert.True(result.Failed, "Validation should fail when ApiKey exists but ApiSecret is null");
+        Assert.Contains("Fiskaly API Secret is required when 'Fiskaly:ApiKey' is configured", result.FailureMessage);
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void Validate_ApiSecretIsEmpty_ReturnsFailure()
+    public void Validate_ApiSecretIsEmptyWhileApiKeyExists_ReturnsFailure()
     {
         // Arrange
         FiskalyConfiguration config = CreateValidConfiguration();
@@ -140,8 +140,8 @@ public class FiskalyConfigurationValidatorTests
         ValidateOptionsResult result = _validator.Validate(null, config);
 
         // Assert
-        Assert.True(result.Failed, "Validation should fail when ApiSecret is empty");
-        Assert.Contains("Fiskaly API Secret is required", result.FailureMessage);
+        Assert.True(result.Failed, "Validation should fail when ApiKey exists but ApiSecret is empty");
+        Assert.Contains("Fiskaly API Secret is required when 'Fiskaly:ApiKey' is configured", result.FailureMessage);
     }
 
     [Trait("Category", "Unit")]

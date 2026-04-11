@@ -10,12 +10,23 @@ public sealed class FiskalyConfigurationValidator : IValidateOptions<FiskalyConf
     public ValidateOptionsResult Validate(string? name, FiskalyConfiguration options)
     {
         List<string> errors = new List<string>();
+        bool hasApiKey = !string.IsNullOrWhiteSpace(options.ApiKey);
+        bool hasApiSecret = !string.IsNullOrWhiteSpace(options.ApiSecret);
 
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
+        if (hasApiKey != hasApiSecret)
         {
-            errors.Add("Fiskaly API Key is required. Configure 'Fiskaly:ApiKey'.");
+            if (!hasApiKey)
+            {
+                errors.Add("Fiskaly API Key is required when 'Fiskaly:ApiSecret' is configured.");
+            }
+
+            if (!hasApiSecret)
+            {
+                errors.Add("Fiskaly API Secret is required when 'Fiskaly:ApiKey' is configured.");
+            }
         }
-        else
+
+        if (hasApiKey)
         {
             if (options.ApiKey.Length < 1 || options.ApiKey.Length > 512)
             {
@@ -34,11 +45,7 @@ public sealed class FiskalyConfigurationValidator : IValidateOptions<FiskalyConf
             }
         }
 
-        if (string.IsNullOrWhiteSpace(options.ApiSecret))
-        {
-            errors.Add("Fiskaly API Secret is required. Configure 'Fiskaly:ApiSecret'.");
-        }
-        else
+        if (hasApiSecret)
         {
             if (!Regex.IsMatch(options.ApiSecret, @"^[0-9A-Za-z]{43}$"))
             {

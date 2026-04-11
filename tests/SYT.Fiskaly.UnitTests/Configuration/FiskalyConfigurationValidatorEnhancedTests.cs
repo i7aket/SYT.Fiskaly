@@ -88,7 +88,7 @@ public class FiskalyConfigurationValidatorEnhancedTests
 
         // Assert
         Assert.True(result.Failed);
-        Assert.Contains(result.Failures, f => f.Contains("Fiskaly API Secret is required"));
+        Assert.Contains(result.Failures, f => f.Contains("Fiskaly API Secret is required when 'Fiskaly:ApiKey' is configured"));
     }
 
     [Trait("Category", "Unit")]
@@ -164,8 +164,8 @@ public class FiskalyConfigurationValidatorEnhancedTests
 
     [Trait("Category", "Unit")]
     [Theory]
-    [InlineData("", "API Key is required")]
-    [InlineData("   ", "API Key is required")] // Whitespace-only triggers IsNullOrWhiteSpace check
+    [InlineData("", "API Key is required when 'Fiskaly:ApiSecret' is configured")]
+    [InlineData("   ", "API Key is required when 'Fiskaly:ApiSecret' is configured")]
     public void Validate_InvalidApiKey_Fails(string invalidKey, string expectedErrorPart)
     {
         // Arrange
@@ -178,6 +178,19 @@ public class FiskalyConfigurationValidatorEnhancedTests
         // Assert
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, f => f.Contains(expectedErrorPart));
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public void Validate_BothCredentialsMissing_Succeeds()
+    {
+        FiskalyConfiguration config = CreateValidConfiguration();
+        config.ApiKey = "";
+        config.ApiSecret = "";
+
+        ValidateOptionsResult result = _validator.Validate(null, config);
+
+        Assert.True(result.Succeeded);
     }
 
     [Trait("Category", "Unit")]

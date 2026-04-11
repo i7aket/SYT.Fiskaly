@@ -6,10 +6,10 @@
     <Nullable>enable</Nullable>
 
     <!-- Versioning -->
-    <Version>1.0.0-rc.2</Version>
+    <Version>1.0.0-rc.3</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <InformationalVersion>1.0.0-rc.2</InformationalVersion>
+    <InformationalVersion>1.0.0-rc.3</InformationalVersion>
 
     <!-- Package Metadata -->
     <PackageId>SYT.Fiskaly</PackageId>
@@ -26,13 +26,16 @@
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>fiskaly;sign-de;kassensichv;dotnet;sdk;pos</PackageTags>
     <PackageReleaseNotes>
-Release candidate for Management API control-plane support.
+Release candidate for optional default Fiskaly credentials and runtime-scoped execution.
 
 Highlights:
+- default ApiKey/ApiSecret are now optional at startup
+- requests without default or scoped credentials now fail only at execution time
 - added Management API write support for organizations and API keys
 - added scoped credentials for per-organization execution
 - added typed API key query models and resilient identifier deserialization
 - strengthened unit and integration coverage for the new surface
+- publish pipeline now verifies deterministic integration coverage before packing
     </PackageReleaseNotes>
   </PropertyGroup>
 

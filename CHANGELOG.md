@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.0-rc.3] - 2026-04-11
+
+### Added
+- Added `FiskalyCredentialsNotConfiguredException` for calls that execute without default or scoped credentials.
+
+### Changed
+- Default `Fiskaly:ApiKey` and `Fiskaly:ApiSecret` are now optional as a pair, which allows startup with runtime-scoped credentials only.
+- Updated package metadata, package README, and repository README for the runtime-scoped credential flow.
+
+### Fixed
+- Validation now rejects only partially configured default credentials instead of requiring a global key pair at startup.
+- Authentication now fails at execution time when no default or scoped credentials are available, instead of failing during service registration.
+- NuGet publish validation now includes the deterministic `WireMock` integration subset before packaging.
+
 ## [1.0.0-rc.2] - 2026-03-10
 
 ### Added
