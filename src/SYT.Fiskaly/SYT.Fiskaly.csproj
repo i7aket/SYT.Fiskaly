@@ -35,7 +35,6 @@ Highlights:
 - added scoped credentials for per-organization execution
 - added typed API key query models and resilient identifier deserialization
 - strengthened unit and integration coverage for the new surface
-- publish pipeline now verifies deterministic integration coverage before packing
     </PackageReleaseNotes>
   </PropertyGroup>
 

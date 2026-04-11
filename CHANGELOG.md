@@ -12,7 +12,6 @@
 ### Fixed
 - Validation now rejects only partially configured default credentials instead of requiring a global key pair at startup.
 - Authentication now fails at execution time when no default or scoped credentials are available, instead of failing during service registration.
-- NuGet publish validation now includes the deterministic `WireMock` integration subset before packaging.
 
 ## [1.0.0-rc.2] - 2026-03-10
 
