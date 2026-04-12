@@ -168,6 +168,35 @@ public class FiskalyConfigurationTests
         Assert.Equal("https://custom.fiskaly.com/api/v2/", config.BaseUrl);
     }
 
+    [Trait("Category", "Unit")]
+    [Fact]
+    public void ConfigurationPriority_BindsAllowHttpForPublicHostsFromAppsettings()
+    {
+        // Arrange
+        Dictionary<string, string?> inMemorySettings = new Dictionary<string, string?>
+        {
+            ["Fiskaly:ApiKey"] = "appsettings_key",
+            ["Fiskaly:ApiSecret"] = TestConstants.ValidApiSecret,
+            ["Fiskaly:AllowHttpForPublicHosts"] = "true"
+        };
+
+        IConfigurationRoot configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings)
+            .Build();
+
+        ServiceCollection services = new ServiceCollection();
+        services.AddLogging();
+
+        // Act
+        services.AddFiskaly(configuration);
+
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
+        FiskalyConfiguration config = serviceProvider.GetRequiredService<IOptions<FiskalyConfiguration>>().Value;
+
+        // Assert
+        Assert.True(config.AllowHttpForPublicHosts);
+    }
+
     #endregion
 
     #region Task 6.3: Configuration Priority (appsettings.json + Programmatic Override)

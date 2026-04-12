@@ -17,10 +17,11 @@ configuration validation for:
 ## Package
 
 - Package ID: `SYT.Fiskaly`
-- Current channel: `1.0.0-rc.3`
+- Current channel: `1.0.0-rc.4`
 - Target framework: `net10.0`
 - License: `MIT`
 - Repository: `https://github.com/i7aket/SYT.Fiskaly`
+- NuGet debugging support: portable PDBs via `.snupkg`, XML docs, and Source Link-compatible repository metadata
 
 ## Installation
 
@@ -44,6 +45,10 @@ Minimum infrastructure settings:
 Default `ApiKey` / `ApiSecret` are optional. Configure them only when the process should have a
 global fallback credential pair. If credentials are supplied later via
 `IFiskalyCredentialScopeFactory`, the SDK can start without default secrets.
+
+Optional transport validation flags:
+- `Fiskaly:AllowHttpForPrivateNetworks=true` allows `http://` for RFC1918/link-local/private LAN hosts.
+- `Fiskaly:AllowHttpForPublicHosts=true` allows `http://` for public hosts. Keep this off unless you intentionally run an insecure proxy endpoint.
 
 Optional per-client overrides are available under:
 - `Fiskaly:AuthClient`
@@ -183,6 +188,7 @@ Console.WriteLine($"Tx finished: {finished.Id}, qr={finished.QrCodeData}");
 - `BaseUrl` and `ManagementBaseUrl` must be absolute and end with `/`.
 - HTTPS is required by default.
 - HTTP is allowed only for localhost, or private networks when `AllowHttpForPrivateNetworks=true`.
+- HTTP for public hosts is allowed only when `AllowHttpForPublicHosts=true`.
 
 ## Default Resilience Profiles
 

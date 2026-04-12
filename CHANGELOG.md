@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0-rc.4] - 2026-04-12
+
+### Added
+- Added `Fiskaly:AllowHttpForPublicHosts` for explicit opt-in public HTTP endpoints, intended for controlled proxy deployments.
+
+### Changed
+- Updated package metadata, README, and release notes for the new public HTTP validation flag.
+- Hardened NuGet packaging with symbol package output, XML documentation, deterministic build settings, and published repository metadata.
+
+### Fixed
+- Validation now permits public `http://` `BaseUrl` and `ManagementBaseUrl` only when `AllowHttpForPublicHosts=true`.
+
 ## [1.0.0-rc.3] - 2026-04-11
 
 ### Added

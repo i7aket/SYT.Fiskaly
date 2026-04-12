@@ -4,12 +4,22 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <DebugType>portable</DebugType>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.xml</AllowedOutputExtensionsInPackageBuildOutputFolder>
+    <NoWarn>$(NoWarn);1591</NoWarn>
 
     <!-- Versioning -->
-    <Version>1.0.0-rc.3</Version>
+    <Version>1.0.0-rc.4</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <InformationalVersion>1.0.0-rc.3</InformationalVersion>
+    <InformationalVersion>1.0.0-rc.4</InformationalVersion>
 
     <!-- Package Metadata -->
     <PackageId>SYT.Fiskaly</PackageId>
@@ -18,7 +28,7 @@
     <Authors>Anatoliy Yermakov</Authors>
     <Company>SYT Open Source Community</Company>
     <PackageProjectUrl>https://github.com/i7aket/SYT.Fiskaly</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/i7aket/SYT.Fiskaly.git</RepositoryUrl>
+    <RepositoryUrl>https://github.com/i7aket/SYT.Fiskaly</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -26,15 +36,13 @@
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>fiskaly;sign-de;kassensichv;dotnet;sdk;pos</PackageTags>
     <PackageReleaseNotes>
-Release candidate for optional default Fiskaly credentials and runtime-scoped execution.
+Release candidate for runtime-scoped credentials and opt-in public HTTP proxy endpoints.
 
 Highlights:
-- default ApiKey/ApiSecret are now optional at startup
-- requests without default or scoped credentials now fail only at execution time
-- added Management API write support for organizations and API keys
-- added scoped credentials for per-organization execution
-- added typed API key query models and resilient identifier deserialization
-- strengthened unit and integration coverage for the new surface
+- added AllowHttpForPublicHosts for explicit public HTTP proxy scenarios
+- kept HTTPS as the default while retaining localhost/private LAN allowances
+- strengthened validation, binding, and package documentation for rc.4
+- added symbol package, XML docs, and Source Link-friendly repository metadata for NuGet publishing
     </PackageReleaseNotes>
   </PropertyGroup>
 

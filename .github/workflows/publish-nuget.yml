@@ -34,13 +34,13 @@ jobs:
         run: dotnet restore tests/SYT.Fiskaly.UnitTests/SYT.Fiskaly.UnitTests.csproj
 
       - name: Build unit tests
-        run: dotnet build tests/SYT.Fiskaly.UnitTests/SYT.Fiskaly.UnitTests.csproj -c Release --no-restore
+        run: dotnet build tests/SYT.Fiskaly.UnitTests/SYT.Fiskaly.UnitTests.csproj -c Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Run unit tests
         run: dotnet test tests/SYT.Fiskaly.UnitTests/SYT.Fiskaly.UnitTests.csproj -c Release --no-build
 
       - name: Pack
-        run: dotnet pack src/SYT.Fiskaly/SYT.Fiskaly.csproj -c Release --no-build -o ./artifacts
+        run: dotnet pack src/SYT.Fiskaly/SYT.Fiskaly.csproj -c Release --no-build -o ./artifacts -p:ContinuousIntegrationBuild=true
 
       - name: Check NuGet API key
         id: keycheck
@@ -66,3 +66,10 @@ jobs:
             --source "https://api.nuget.org/v3/index.json" \
             --api-key "$NUGET_API_KEY" \
             --skip-duplicate
+
+          if compgen -G "./artifacts/*.snupkg" > /dev/null; then
+            dotnet nuget push "./artifacts/*.snupkg" \
+              --source "https://api.nuget.org/v3/index.json" \
+              --api-key "$NUGET_API_KEY" \
+              --skip-duplicate
+          fi

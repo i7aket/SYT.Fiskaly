@@ -57,9 +57,9 @@ public sealed class FiskalyConfigurationValidator : IValidateOptions<FiskalyConf
             }
         }
 
-        if (!TryValidateUrl(options.BaseUrl, options.AllowHttpForPrivateNetworks))
+        if (!TryValidateUrl(options.BaseUrl, options.AllowHttpForPrivateNetworks, options.AllowHttpForPublicHosts))
         {
-            errors.Add("Fiskaly Base URL must be a valid HTTPS URL (HTTP allowed only for localhost/testing; private LAN allowed when Fiskaly:AllowHttpForPrivateNetworks=true).");
+            errors.Add("Fiskaly Base URL must be a valid HTTPS URL (HTTP allowed only for localhost/testing; private LAN allowed when Fiskaly:AllowHttpForPrivateNetworks=true; public hosts allowed when Fiskaly:AllowHttpForPublicHosts=true).");
         }
         else if (!string.IsNullOrEmpty(options.BaseUrl) && !options.BaseUrl.EndsWith("/"))
         {
@@ -69,9 +69,9 @@ public sealed class FiskalyConfigurationValidator : IValidateOptions<FiskalyConf
                 "Add '/' to the end.");
         }
 
-        if (!TryValidateUrl(options.ManagementBaseUrl, options.AllowHttpForPrivateNetworks))
+        if (!TryValidateUrl(options.ManagementBaseUrl, options.AllowHttpForPrivateNetworks, options.AllowHttpForPublicHosts))
         {
-            errors.Add("Fiskaly Management Base URL must be a valid HTTPS URL (HTTP allowed only for localhost/testing; private LAN allowed when Fiskaly:AllowHttpForPrivateNetworks=true).");
+            errors.Add("Fiskaly Management Base URL must be a valid HTTPS URL (HTTP allowed only for localhost/testing; private LAN allowed when Fiskaly:AllowHttpForPrivateNetworks=true; public hosts allowed when Fiskaly:AllowHttpForPublicHosts=true).");
         }
         else if (!string.IsNullOrEmpty(options.ManagementBaseUrl) && !options.ManagementBaseUrl.EndsWith("/"))
         {
@@ -140,7 +140,7 @@ public sealed class FiskalyConfigurationValidator : IValidateOptions<FiskalyConf
         }
     }
 
-    private static bool TryValidateUrl(string url, bool allowHttpForPrivateNetworks)
+    private static bool TryValidateUrl(string url, bool allowHttpForPrivateNetworks, bool allowHttpForPublicHosts)
     {
         if (string.IsNullOrWhiteSpace(url))
             return false;
@@ -161,6 +161,11 @@ public sealed class FiskalyConfigurationValidator : IValidateOptions<FiskalyConf
         if (uriResult.Scheme == Uri.UriSchemeHttp
             && allowHttpForPrivateNetworks
             && IsPrivateNetworkHost(uriResult.Host))
+        {
+            return true;
+        }
+
+        if (uriResult.Scheme == Uri.UriSchemeHttp && allowHttpForPublicHosts)
         {
             return true;
         }

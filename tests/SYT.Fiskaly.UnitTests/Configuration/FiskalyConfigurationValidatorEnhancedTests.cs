@@ -292,6 +292,22 @@ public class FiskalyConfigurationValidatorEnhancedTests
 
     [Trait("Category", "Unit")]
     [Fact]
+    public void Validate_PublicHttpBaseUrlWithFlag_Succeeds()
+    {
+        // Arrange
+        FiskalyConfiguration config = CreateValidConfiguration();
+        config.BaseUrl = "http://92.205.183.9:10200/porta/api/v2/";
+        config.AllowHttpForPublicHosts = true;
+
+        // Act
+        ValidateOptionsResult result = _validator.Validate(null, config);
+
+        // Assert
+        Assert.True(result.Succeeded);
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
     public void Validate_InvalidBaseUrl_FailsBeforeTrailingSlashCheck()
     {
         // Arrange: Invalid URL (not HTTP/HTTPS)
@@ -397,6 +413,39 @@ public class FiskalyConfigurationValidatorEnhancedTests
         );
 
         Assert.Contains("must end with trailing slash", exception.Message);
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public void Startup_PublicHttpBaseUrlsWithFlag_DoNotThrowOptionsValidationException()
+    {
+        // Arrange
+        Dictionary<string, string?> inMemorySettings = new Dictionary<string, string?>
+        {
+            ["Fiskaly:ApiKey"] = "test_key_valid",
+            ["Fiskaly:ApiSecret"] = "abcdefghijklmnopqrstuvwxyz01234567890ABCDEF",
+            ["Fiskaly:BaseUrl"] = "http://92.205.183.9:10200/porta/api/v2/",
+            ["Fiskaly:ManagementBaseUrl"] = "http://92.205.183.9:10200/porta/api/v0/",
+            ["Fiskaly:AllowHttpForPublicHosts"] = "true"
+        };
+
+        IConfigurationRoot configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings)
+            .Build();
+
+        ServiceCollection services = new ServiceCollection();
+        services.AddLogging();
+        services.AddFiskaly(configuration);
+
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
+
+        // Act
+        FiskalyConfiguration config = serviceProvider.GetRequiredService<IOptions<FiskalyConfiguration>>().Value;
+
+        // Assert
+        Assert.True(config.AllowHttpForPublicHosts);
+        Assert.Equal("http://92.205.183.9:10200/porta/api/v2/", config.BaseUrl);
+        Assert.Equal("http://92.205.183.9:10200/porta/api/v0/", config.ManagementBaseUrl);
     }
 
     #endregion

@@ -12,6 +12,8 @@ public class FiskalyConfiguration
 
     public bool AllowHttpForPrivateNetworks { get; set; }
 
+    public bool AllowHttpForPublicHosts { get; set; }
+
     public int TimeoutSeconds { get; set; } = 5;
 
     public int RetryAttempts { get; set; } = 3;
