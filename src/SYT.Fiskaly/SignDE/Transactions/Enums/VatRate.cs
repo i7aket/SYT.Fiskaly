@@ -2,7 +2,6 @@ using System.Text.Json.Serialization;
 
 namespace SYT.Fiskaly.SignDE.Transactions.Enums;
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
 /// <summary>
 /// VAT rate category for fiskaly SIGN DE transactions.
 /// </summary>
@@ -11,6 +10,7 @@ namespace SYT.Fiskaly.SignDE.Transactions.Enums;
 /// <c>UST_SCHLUESSEL</c> so exports can use <c>(int)VatRate</c>, while SIGN DE uses the
 /// JSON string names (NORMAL/REDUCED_1/SPECIAL_RATE_1/SPECIAL_RATE_2/NULL).
 /// </remarks>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum VatRate
 {
     [JsonStringEnumMemberName("NORMAL")]

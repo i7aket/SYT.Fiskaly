@@ -346,6 +346,39 @@ public class FiskalyConfigurationValidatorTests
 
     [Trait("Category", "Unit")]
     [Fact]
+    public void Validate_BaseUrlPublicHttpWithoutFlag_ReturnsFailure()
+    {
+        // Arrange
+        FiskalyConfiguration config = CreateValidConfiguration();
+        config.BaseUrl = "http://92.205.183.9:10200/porta/api/v2/";
+        config.AllowHttpForPublicHosts = false;
+
+        // Act
+        ValidateOptionsResult result = _validator.Validate(null, config);
+
+        // Assert
+        Assert.True(result.Failed, "Validation should fail when public HTTP is disabled.");
+        Assert.Contains("Base URL must be a valid HTTPS URL", result.FailureMessage);
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public void Validate_BaseUrlPublicHttpWithFlag_ReturnsSuccess()
+    {
+        // Arrange
+        FiskalyConfiguration config = CreateValidConfiguration();
+        config.BaseUrl = "http://92.205.183.9:10200/porta/api/v2/";
+        config.AllowHttpForPublicHosts = true;
+
+        // Act
+        ValidateOptionsResult result = _validator.Validate(null, config);
+
+        // Assert
+        Assert.False(result.Failed, $"Validation should succeed when public HTTP is enabled. Errors: {result.FailureMessage}");
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
     public void Validate_BaseUrlHttpsWithTrailingSlash_ReturnsSuccess()
     {
         // Arrange
@@ -475,6 +508,22 @@ public class FiskalyConfigurationValidatorTests
 
         // Assert
         Assert.False(result.Failed, $"Validation should succeed when private LAN HTTP is enabled. Errors: {result.FailureMessage}");
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public void Validate_ManagementBaseUrlPublicHttpWithFlag_ReturnsSuccess()
+    {
+        // Arrange
+        FiskalyConfiguration config = CreateValidConfiguration();
+        config.ManagementBaseUrl = "http://92.205.183.9:10200/porta/api/v0/";
+        config.AllowHttpForPublicHosts = true;
+
+        // Act
+        ValidateOptionsResult result = _validator.Validate(null, config);
+
+        // Assert
+        Assert.False(result.Failed, $"Validation should succeed when public HTTP is enabled. Errors: {result.FailureMessage}");
     }
 
     [Trait("Category", "Unit")]
