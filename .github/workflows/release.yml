@@ -1,9 +1,12 @@
 name: Release
 
+# Manual only. A published version can never be reused, and rc.4 proved how that gets spent: the same version
+# was published twice on 2026-04-12, first by workflow_dispatch from 62a8e17 and 23 minutes later by a push of
+# the merge commit 8bba672. Identical trees, different SHAs - SourceLink stamps the commit into the assembly,
+# so the second build produced a different MVID and a different PDB id. nuget.org rejected the nupkg as a
+# duplicate but still accepted the symbols, then found they matched no published dll: "pdb(s) for a
+# corresponding dll(s) not found in the nuget package". One trigger, one deliberate run.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 concurrency:
@@ -44,11 +47,9 @@ jobs:
       - name: Run unit tests
         run: dotnet test tests/SYT.Fiskaly.UnitTests/SYT.Fiskaly.UnitTests.csproj -c Release --no-build
 
-      # The library is built explicitly before packing. Previously only the TEST project was built and the
-      # library was packed with --no-build, which relies on whatever happened to be in the output directory -
-      # and a .pdb left over from a different build does not match the .dll, which is what nuget.org rejects
-      # ("the uploaded symbols package contains pdb(s) for a corresponding dll(s) not found in the nuget
-      # package"). That is the most plausible cause of the rc.4 symbols failure; the packaging itself is sound.
+      # The library is built explicitly so packing does not depend on the test project's build as a side
+      # effect. This is hygiene, not the fix for the rc.4 symbols failure - that one was cross-run, see the
+      # trigger comment above.
       - name: Build library
         run: dotnet build src/SYT.Fiskaly/SYT.Fiskaly.csproj -c Release -p:ContinuousIntegrationBuild=true
 
@@ -62,16 +63,11 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
 
+      # No --skip-duplicate: a second attempt at an already-published version must fail loudly rather than
+      # quietly push mismatched symbols over it. The paired .snupkg is uploaded by this same command, so it is
+      # not pushed separately - doing so was how rc.4's symbols reached nuget.org after its nupkg was skipped.
       - name: Push to NuGet
         run: |
           dotnet nuget push "./artifacts/*.nupkg" \
             --source "https://api.nuget.org/v3/index.json" \
-            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
-            --skip-duplicate
-
-          if compgen -G "./artifacts/*.snupkg" > /dev/null; then
-            dotnet nuget push "./artifacts/*.snupkg" \
-              --source "https://api.nuget.org/v3/index.json" \
-              --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
-              --skip-duplicate
-          fi
+            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"

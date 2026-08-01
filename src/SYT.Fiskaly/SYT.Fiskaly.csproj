@@ -41,8 +41,8 @@ Release candidate exposing the raw transaction response body for fiscal audit.
 Highlights:
 - TxResponse.RawJson carries the exact body a transaction response was deserialized from, so a German fiscal
   signature can be shown to an auditor as the provider returned it rather than as this SDK read it
-- captured on both the write and the read path: after a lost connection the SIGN DE recovery flow re-observes a
-  finished transaction with GET rather than FINISH, and that is the case an audit is most likely to ask about
+- captured on both the write and the read path, so a recovery that re-observes a finished transaction with GET
+  rather than FINISH records the body too - the case an audit is most likely to ask about
 - added through new executor methods, so ExecutePutAsync/ExecuteGetAsync, every existing caller and
   ITransactionClient keep their shape - no consumer has to change and no mock has to be retaught
 - buffering is confined to transactions; export downloads keep streaming straight into the deserializer
