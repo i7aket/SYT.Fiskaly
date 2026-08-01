@@ -11,6 +11,17 @@ namespace SYT.Fiskaly.SignDE.Transactions.Responses;
 
 public class TxResponse
 {
+    /// <summary>
+    /// The exact response body this instance was deserialized from, when the caller asked for it.
+    ///
+    /// <para>Not part of the wire contract - <see cref="JsonIgnoreAttribute"/> keeps it out of both directions
+    /// of serialization. It exists because a German fiscal signature may have to be shown to an auditor as the
+    /// provider actually returned it, rather than as this library read it. Null when the response came through
+    /// a path that did not buffer the body, which is every path that predates this.</para>
+    /// </summary>
+    [JsonIgnore]
+    public string? RawJson { get; internal set; }
+
     [JsonPropertyName("_id")]
     public TxId? Id { get; init; }
     [JsonPropertyName("state")]

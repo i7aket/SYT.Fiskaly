@@ -16,10 +16,10 @@
     <NoWarn>$(NoWarn);1591</NoWarn>
 
     <!-- Versioning -->
-    <Version>1.0.0-rc.4</Version>
+    <Version>1.0.0-rc.5</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <InformationalVersion>1.0.0-rc.4</InformationalVersion>
+    <InformationalVersion>1.0.0-rc.5</InformationalVersion>
 
     <!-- Package Metadata -->
     <PackageId>SYT.Fiskaly</PackageId>
@@ -36,13 +36,17 @@
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>fiskaly;sign-de;kassensichv;dotnet;sdk;pos</PackageTags>
     <PackageReleaseNotes>
-Release candidate for runtime-scoped credentials and opt-in public HTTP proxy endpoints.
+Release candidate exposing the raw transaction response body for fiscal audit.
 
 Highlights:
-- added AllowHttpForPublicHosts for explicit public HTTP proxy scenarios
-- kept HTTPS as the default while retaining localhost/private LAN allowances
-- strengthened validation, binding, and package documentation for rc.4
-- added symbol package, XML docs, and Source Link-friendly repository metadata for NuGet publishing
+- TxResponse.RawJson carries the exact body a transaction response was deserialized from, so a German fiscal
+  signature can be shown to an auditor as the provider returned it rather than as this SDK read it
+- captured on both the write and the read path, so a recovery that re-observes a finished transaction with GET
+  rather than FINISH records the body too - the case an audit is most likely to ask about
+- added through new executor methods, so ExecutePutAsync/ExecuteGetAsync, every existing caller and
+  ITransactionClient keep their shape - no consumer has to change and no mock has to be retaught
+- buffering is confined to transactions; export downloads keep streaming straight into the deserializer
+- provider errors are not captured: the error handler raises before the body is read
     </PackageReleaseNotes>
   </PropertyGroup>
 

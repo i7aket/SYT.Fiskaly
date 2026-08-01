@@ -1,0 +1,73 @@
+name: Release
+
+# Manual only. A published version can never be reused, and rc.4 proved how that gets spent: the same version
+# was published twice on 2026-04-12, first by workflow_dispatch from 62a8e17 and 23 minutes later by a push of
+# the merge commit 8bba672. Identical trees, different SHAs - SourceLink stamps the commit into the assembly,
+# so the second build produced a different MVID and a different PDB id. nuget.org rejected the nupkg as a
+# duplicate but still accepted the symbols, then found they matched no published dll: "pdb(s) for a
+# corresponding dll(s) not found in the nuget package". One trigger, one deliberate run.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    # Publishing is a deliberate act, not a side effect of merging. The environment adds a human gate, and the
+    # trusted-publishing policy is bound to it, so a token can only be minted from a run that passed through it.
+    environment: nuget
+
+    permissions:
+      contents: read
+      id-token: write  # required for the OIDC token exchanged for a short-lived NuGet key
+
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore unit tests
+        run: dotnet restore tests/SYT.Fiskaly.UnitTests/SYT.Fiskaly.UnitTests.csproj
+
+      - name: Build unit tests
+        run: dotnet build tests/SYT.Fiskaly.UnitTests/SYT.Fiskaly.UnitTests.csproj -c Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Run unit tests
+        run: dotnet test tests/SYT.Fiskaly.UnitTests/SYT.Fiskaly.UnitTests.csproj -c Release --no-build
+
+      # The library is built explicitly so packing does not depend on the test project's build as a side
+      # effect. This is hygiene, not the fix for the rc.4 symbols failure - that one was cross-run, see the
+      # trigger comment above.
+      - name: Build library
+        run: dotnet build src/SYT.Fiskaly/SYT.Fiskaly.csproj -c Release -p:ContinuousIntegrationBuild=true
+
+      - name: Pack
+        run: dotnet pack src/SYT.Fiskaly/SYT.Fiskaly.csproj -c Release --no-build -o ./artifacts -p:ContinuousIntegrationBuild=true
+
+      # Minted immediately before the push: the temporary key lives one hour and each token buys exactly one.
+      - name: NuGet login (OIDC to short-lived key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      # No --skip-duplicate: a second attempt at an already-published version must fail loudly rather than
+      # quietly push mismatched symbols over it. The paired .snupkg is uploaded by this same command, so it is
+      # not pushed separately - doing so was how rc.4's symbols reached nuget.org after its nupkg was skipped.
+      - name: Push to NuGet
+        run: |
+          dotnet nuget push "./artifacts/*.nupkg" \
+            --source "https://api.nuget.org/v3/index.json" \
+            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
