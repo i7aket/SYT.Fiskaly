@@ -166,7 +166,15 @@ public class TransactionClient(
             path += $"?tx_revision={txRevision.Value}";
         }
 
-        TxResponse transaction = await _executor.ExecuteGetAsync<TxResponse>(_httpClient, path, cancellationToken).ConfigureAwait(false);
+        // Raw captured on the read path too, and for the reason that matters most: after a lost connection the
+        // SIGN DE recovery flow re-observes a finished transaction with a GET rather than a FINISH, so a
+        // capture confined to writes would record nothing in exactly the case an audit is most likely to ask
+        // about.
+        (TxResponse transaction, string rawJson) =
+            await _executor.ExecuteGetWithRawAsync<TxResponse>(_httpClient, path, cancellationToken)
+                .ConfigureAwait(false);
+
+        transaction.RawJson = rawJson;
 
         string? stateName = transaction.State?.ToApiString();
         _logger.LogTransactionRetrieved(transaction.Id, transaction.Number, stateName, transaction.Revision);
@@ -355,10 +363,16 @@ public class TransactionClient(
 
         _logger.LogExecutingTransactionPut(tssId.Value.ToString(), transactionKey, revision);
 
-        return await _executor.ExecutePutAsync<TRequest, TxResponse>(
+        // Buffering the body here rather than streaming it: a transaction response carries a fiscal signature,
+        // and an audit may later need what the provider actually sent rather than this library's reading of it.
+        // Confined to transactions on purpose - export downloads stay on the streaming path.
+        (TxResponse value, string rawJson) = await _executor.ExecutePutWithRawAsync<TRequest, TxResponse>(
             _httpClient,
             $"tss/{tssId.Value}/tx/{transactionKey}?tx_revision={revision}",
             request,
             cancellationToken).ConfigureAwait(false);
+
+        value.RawJson = rawJson;
+        return value;
     }
 }
