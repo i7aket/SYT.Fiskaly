@@ -213,6 +213,61 @@ public class HttpContentExtensionsTests
     // Test DTOs
     // ============================================================================
 
+    // ============================================================================
+    // Raw-preserving read (fiscal audit)
+    // ============================================================================
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public async Task ReadFiskalyJsonWithRawAsync_ReturnsTheDeserializedValueAndTheExactBody()
+    {
+        // A German fiscal signature may have to be shown to an auditor as the provider returned it, so the
+        // body must come back untouched - not re-serialized from the parsed object, which would silently
+        // normalise formatting, property order and anything this SDK does not model.
+        string json = """{"name":"Test","value":123,"unmodelled":"kept"}""";
+        using StringContent content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        (TestDto value, string rawJson) = await content.ReadFiskalyJsonWithRawAsync<TestDto>(_jsonOptions);
+
+        Assert.Equal("Test", value.Name);
+        Assert.Equal(123, value.Value);
+        Assert.Equal(json, rawJson);
+        Assert.Contains("unmodelled", rawJson, StringComparison.Ordinal);
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public async Task ReadFiskalyJsonWithRawAsync_PreservesFormattingTheParsedObjectWouldLose()
+    {
+        string json = "{\n  \"name\" : \"Test\",\n  \"value\" : 123\n}";
+        using StringContent content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        (_, string rawJson) = await content.ReadFiskalyJsonWithRawAsync<TestDto>(_jsonOptions);
+
+        Assert.Equal(json, rawJson);
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public async Task ReadFiskalyJsonWithRawAsync_WithJsonNull_ThrowsLikeTheStreamingRead()
+    {
+        // Same failure shape as ReadFiskalyJsonAsync: buffering must not change how a caller sees an error.
+        using StringContent content = new StringContent("null", Encoding.UTF8, "application/json");
+
+        await Assert.ThrowsAsync<FiskalyException>(
+            () => content.ReadFiskalyJsonWithRawAsync<TestDto>(_jsonOptions));
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public async Task ReadFiskalyJsonWithRawAsync_WithEmptyBody_ThrowsLikeTheStreamingRead()
+    {
+        using StringContent content = new StringContent(string.Empty, Encoding.UTF8, "application/json");
+
+        await Assert.ThrowsAsync<JsonException>(
+            () => content.ReadFiskalyJsonWithRawAsync<TestDto>(_jsonOptions));
+    }
+
     private class TestDto
     {
         public string? Name { get; set; }
