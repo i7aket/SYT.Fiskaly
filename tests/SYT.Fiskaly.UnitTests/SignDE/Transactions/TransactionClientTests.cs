@@ -1308,6 +1308,67 @@ public class TransactionClientTests
 
     #endregion
 
+    #region Raw response capture (fiscal audit)
+
+    /// <summary>
+    /// The read path is the one that matters: a recovery that re-observes a finished transaction does so with
+    /// a GET rather than a FINISH, so a capture confined to writes would record nothing in the case an audit
+    /// is most likely to ask about. Asserted at the CLIENT level on purpose - the extension-level tests would
+    /// all still pass if the client simply stopped calling the raw-preserving read.
+    /// </summary>
+    [Fact]
+    public async Task GetTransactionAsync_CarriesTheExactResponseBody()
+    {
+        const string body = """{"_id":"7ac0a1f2-0000-4000-8000-000000000001","number":4711,"unmodelled":"kept"}""";
+
+        Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        mockHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.Is<HttpRequestMessage>(req => req.Method == HttpMethod.Get),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            });
+
+        TransactionClient client = CreateTransactionClient(mockHandler.Object);
+
+        TxResponse result = await client.GetTransactionAsync(
+            _testTssId, _testTransactionId, txRevision: null, CancellationToken.None);
+
+        Assert.Equal(body, result.RawJson);
+        Assert.Contains("unmodelled", result.RawJson!, StringComparison.Ordinal);
+    }
+
+    /// <summary>The write path: start, finish, update and cancel all run through the same PUT helper.</summary>
+    [Fact]
+    public async Task StartTransactionAsync_CarriesTheExactResponseBody()
+    {
+        const string body = """{"_id":"7ac0a1f2-0000-4000-8000-000000000002","number":4712,"unmodelled":"kept"}""";
+
+        Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        mockHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.Is<HttpRequestMessage>(req => req.Method == HttpMethod.Put),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            });
+
+        TransactionClient client = CreateTransactionClient(mockHandler.Object);
+
+        TxResponse result = await client.StartTransactionAsync(
+            _testTssId,
+            _testTransactionId,
+            new StartTransactionRequest { ClientId = _testClientId },
+            CancellationToken.None);
+
+        Assert.Equal(body, result.RawJson);
+    }
+
+    #endregion
+
     #region GetTransaction Tests (4 tests)
 
     [Fact]

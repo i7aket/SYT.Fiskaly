@@ -13,11 +13,12 @@ configuration validation for:
 - Management API API keys via `IApiKeyClient`
 - Authentication via `IFiskalyAuthenticationService`
 - Scoped per-organization credentials via `IFiskalyCredentialScopeFactory`
+- Raw transaction response bodies via `TxResponse.RawJson`, for fiscal audit
 
 ## Package
 
 - Package ID: `SYT.Fiskaly`
-- Current channel: `1.0.0-rc.4`
+- Current channel: `1.0.0-rc.5`
 - Target framework: `net10.0`
 - License: `MIT`
 - Repository: `https://github.com/i7aket/SYT.Fiskaly`
