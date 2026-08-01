@@ -6,9 +6,6 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 concurrency:
   group: nuget-publish-main
   cancel-in-progress: false
@@ -16,6 +13,14 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+
+    # Publishing is a deliberate act, not a side effect of merging. The environment adds a human gate, and the
+    # trusted-publishing policy is bound to it, so a token can only be minted from a run that passed through it.
+    environment: nuget
+
+    permissions:
+      contents: read
+      id-token: write  # required for the OIDC token exchanged for a short-lived NuGet key
 
     env:
       DOTNET_NOLOGO: true
@@ -39,37 +44,34 @@ jobs:
       - name: Run unit tests
         run: dotnet test tests/SYT.Fiskaly.UnitTests/SYT.Fiskaly.UnitTests.csproj -c Release --no-build
 
+      # The library is built explicitly before packing. Previously only the TEST project was built and the
+      # library was packed with --no-build, which relies on whatever happened to be in the output directory -
+      # and a .pdb left over from a different build does not match the .dll, which is what nuget.org rejects
+      # ("the uploaded symbols package contains pdb(s) for a corresponding dll(s) not found in the nuget
+      # package"). That is the most plausible cause of the rc.4 symbols failure; the packaging itself is sound.
+      - name: Build library
+        run: dotnet build src/SYT.Fiskaly/SYT.Fiskaly.csproj -c Release -p:ContinuousIntegrationBuild=true
+
       - name: Pack
         run: dotnet pack src/SYT.Fiskaly/SYT.Fiskaly.csproj -c Release --no-build -o ./artifacts -p:ContinuousIntegrationBuild=true
 
-      - name: Check NuGet API key
-        id: keycheck
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          if [ -z "$NUGET_API_KEY" ]; then
-            echo "has_key=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_key=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Skip publish (missing NUGET_API_KEY)
-        if: ${{ steps.keycheck.outputs.has_key == 'false' }}
-        run: echo "NUGET_API_KEY is not configured. Package publish is skipped."
+      # Minted immediately before the push: the temporary key lives one hour and each token buys exactly one.
+      - name: NuGet login (OIDC to short-lived key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
 
       - name: Push to NuGet
-        if: ${{ steps.keycheck.outputs.has_key == 'true' }}
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           dotnet nuget push "./artifacts/*.nupkg" \
             --source "https://api.nuget.org/v3/index.json" \
-            --api-key "$NUGET_API_KEY" \
+            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
             --skip-duplicate
 
           if compgen -G "./artifacts/*.snupkg" > /dev/null; then
             dotnet nuget push "./artifacts/*.snupkg" \
               --source "https://api.nuget.org/v3/index.json" \
-              --api-key "$NUGET_API_KEY" \
+              --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
               --skip-duplicate
           fi
