@@ -1,4 +1,5 @@
 using System.Text.Json;
+using SYT.Fiskaly.Exceptions;
 using SYT.Fiskaly.Http;
 using SYT.Fiskaly.SignDE.Exports.Dsfinvk;
 using SYT.Fiskaly.SignDE.Exports.Enums;
@@ -110,14 +111,18 @@ public class ExportClient(
 
         if (export.State != ExportState.Completed)
         {
-            string message = export.State == ExportState.Error
-                ? $"Cannot download export {exportId.Value}: export failed with state ERROR. Exception: {export.ExceptionCode}"
-                : $"Cannot download export {exportId.Value}: state is {export.State}, expected COMPLETED";
-
-            _logger.LogWarning(message);
-            throw new InvalidOperationException(message);
+            // A typed exception inside the Fiskaly hierarchy, not a bare InvalidOperationException: this is an
+            // ordinary race - the state is read here, immediately before the download - and callers catch
+            // FiskalyException. Left outside the hierarchy it escaped as an unhandled exception and reached
+            // consuming applications as a 500.
+            FiskalyExportNotReadyException notReady = new(exportId, export.State, export.ExceptionCode);
+            _logger.LogWarning("{Message}", notReady.Message);
+            throw notReady;
         }
 
+        // No EnsureSuccessStatusCode here on purpose: FiskalyErrorHandler sits in every typed client's pipeline
+        // (AddFiskalyPipeline) and has already turned any non-2xx into a FiskalyApiException before the
+        // response gets back here, so the check would be dead code that hides where the real guard lives.
         using HttpResponseMessage response = await _httpClient.GetAsync($"tss/{tssId.Value}/export/{exportId.Value}/file", cancellationToken).ConfigureAwait(false);
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 

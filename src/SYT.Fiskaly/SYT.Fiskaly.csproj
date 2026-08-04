@@ -16,10 +16,10 @@
     <NoWarn>$(NoWarn);1591</NoWarn>
 
     <!-- Versioning -->
-    <Version>1.0.0-rc.5</Version>
+    <Version>1.0.0-rc.6</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <InformationalVersion>1.0.0-rc.5</InformationalVersion>
+    <InformationalVersion>1.0.0-rc.6</InformationalVersion>
 
     <!-- Package Metadata -->
     <PackageId>SYT.Fiskaly</PackageId>
@@ -36,17 +36,18 @@
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>fiskaly;sign-de;kassensichv;dotnet;sdk;pos</PackageTags>
     <PackageReleaseNotes>
-Release candidate exposing the raw transaction response body for fiscal audit.
+Release candidate turning "the export is not downloadable yet" into a catchable failure.
 
 Highlights:
-- TxResponse.RawJson carries the exact body a transaction response was deserialized from, so a German fiscal
-  signature can be shown to an auditor as the provider returned it rather than as this SDK read it
-- captured on both the write and the read path, so a recovery that re-observes a finished transaction with GET
-  rather than FINISH records the body too - the case an audit is most likely to ask about
-- added through new executor methods, so ExecutePutAsync/ExecuteGetAsync, every existing caller and
-  ITransactionClient keep their shape - no consumer has to change and no mock has to be retaught
-- buffering is confined to transactions; export downloads keep streaming straight into the deserializer
-- provider errors are not captured: the error handler raises before the body is read
+- DownloadExportAsync now raises FiskalyExportNotReadyException instead of a bare InvalidOperationException.
+  The old type sat outside the FiskalyException hierarchy every caller catches, so an ordinary race - the
+  state is read here, immediately before the download, and the export finishes in between - escaped as an
+  unhandled exception and surfaced as an HTTP 500 in consuming applications
+- the exception carries State, ExportId and the provider's ExceptionCode, plus IsTransient, so a caller can
+  tell the two cases apart: PENDING/WORKING becomes downloadable on its own and is worth polling, ERROR never
+  does and polling it is an infinite wait
+- source-compatible for anyone who catches FiskalyException; only code that catches InvalidOperationException
+  specifically around a download needs to change
     </PackageReleaseNotes>
   </PropertyGroup>
 
