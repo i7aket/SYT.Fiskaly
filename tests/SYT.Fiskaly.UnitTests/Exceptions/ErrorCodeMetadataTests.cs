@@ -37,6 +37,90 @@ public class ErrorCodeMetadataTests
         Assert.Contains("Unknown error code", metadata.RecoveryHint);
     }
 
+    /// <summary>
+    /// The specification's retry rules are written in terms of HTTP status, and the responses least likely to
+    /// carry a code the SDK knows - a bare 503, a gateway 502 - are exactly the ones it says to retry. Judging
+    /// an unrecognised code by the status is what keeps those retryable.
+    /// </summary>
+    [Trait("Category", "Unit")]
+    [Theory]
+    [InlineData(429, FiskalyErrorCategory.Transient, true)]
+    [InlineData(499, FiskalyErrorCategory.Transient, true)]
+    [InlineData(500, FiskalyErrorCategory.Infrastructure, true)]
+    [InlineData(502, FiskalyErrorCategory.Infrastructure, true)]
+    [InlineData(503, FiskalyErrorCategory.Infrastructure, true)]
+    public void ForUnrecognizedCode_RetryableStatus_IsRetried(
+        int statusCode,
+        FiskalyErrorCategory expectedCategory,
+        bool expectedRetryable)
+    {
+        Metadata metadata = ErrorCodeMetadata.ForUnrecognizedCode((HttpStatusCode)statusCode);
+
+        Assert.Equal(expectedCategory, metadata.Category);
+        Assert.Equal(expectedRetryable, metadata.IsRetryable);
+        Assert.Equal((HttpStatusCode)statusCode, metadata.HttpStatusCode);
+    }
+
+    [Trait("Category", "Unit")]
+    [Theory]
+    [InlineData(400)]
+    [InlineData(404)]
+    [InlineData(409)]
+    [InlineData(423)]
+    public void ForUnrecognizedCode_ClientError_StaysPermanentAndKeepsItsStatus(int statusCode)
+    {
+        Metadata metadata = ErrorCodeMetadata.ForUnrecognizedCode((HttpStatusCode)statusCode);
+
+        Assert.Equal(FiskalyErrorCategory.Permanent, metadata.Category);
+        Assert.False(metadata.IsRetryable);
+
+        // The status is reported as it arrived rather than flattened to 500: a 423 that reads as an internal
+        // server error tells whoever is debugging the wrong story.
+        Assert.Equal((HttpStatusCode)statusCode, metadata.HttpStatusCode);
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public void Get_WithStatus_PrefersTheCodeWhenItIsKnown()
+    {
+        // A known code decides even when the status would say otherwise - the code is the more specific fact.
+        Metadata metadata = ErrorCodeMetadata.Get(FiskalyErrorCode.E_TSS_DISABLED, HttpStatusCode.ServiceUnavailable);
+
+        Assert.Equal(FiskalyErrorCategory.Permanent, metadata.Category);
+        Assert.False(metadata.IsRetryable);
+    }
+
+    /// <summary>
+    /// Codes the 2.1.35 specification on disk does not contain but the live API emits. Until they were named
+    /// here they fell through to the unknown-code path.
+    /// </summary>
+    [Trait("Category", "Unit")]
+    [Theory]
+    [InlineData(FiskalyErrorCode.E_CERTIFICATE_EXPIRED, FiskalyErrorCategory.Permanent, false)]
+    [InlineData(FiskalyErrorCode.E_NOT_FOUND, FiskalyErrorCategory.Permanent, false)]
+    [InlineData(FiskalyErrorCode.SMAERS_GATEWAY_ERROR_PRECONDITION_UNEXPORTED_LOGS, FiskalyErrorCategory.Infrastructure, true)]
+    [InlineData(FiskalyErrorCode.ERROR_IDENTIFY_ERS, FiskalyErrorCategory.Infrastructure, true)]
+    public void Get_CodesAddedInRc7_AreClassified(
+        FiskalyErrorCode errorCode,
+        FiskalyErrorCategory expectedCategory,
+        bool expectedRetryable)
+    {
+        Metadata metadata = ErrorCodeMetadata.Get(errorCode);
+
+        Assert.Equal(expectedCategory, metadata.Category);
+        Assert.Equal(expectedRetryable, metadata.IsRetryable);
+        Assert.NotEmpty(metadata.RecoveryHint);
+        Assert.DoesNotContain("Unknown error code", metadata.RecoveryHint);
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public void Get_CertificateExpired_TellsTheOperatorToReplaceTheTss()
+    {
+        // Nothing about an expired certificate can be repaired, so the hint has to name the only way out.
+        Assert.Contains("replacement TSS", ErrorCodeMetadata.Get(FiskalyErrorCode.E_CERTIFICATE_EXPIRED).RecoveryHint);
+    }
+
     [Trait("Category", "Unit")]
     [Theory]
     [InlineData(FiskalyErrorCode.E_TSS_LOCKED, "SDK retries automatically")]

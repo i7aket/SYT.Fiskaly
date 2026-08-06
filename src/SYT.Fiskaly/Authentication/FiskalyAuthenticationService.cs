@@ -140,6 +140,24 @@ public class FiskalyAuthenticationService : IFiskalyAuthenticationService
         return authResponse;
     }
 
+    public void InvalidateToken(IFiskalyCredentials? credentials = null)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        IFiskalyCredentials resolved = credentials ?? _defaultCredentials
+            ?? throw new FiskalyCredentialsNotConfiguredException();
+
+        string cacheKey = BuildCacheKey(resolved.CreatePayload());
+
+        if (_tokenCache.TryRemove(cacheKey, out _))
+        {
+            _logger.LogTokenMissingOrExpired(resolved.CreatePayload().Kind);
+        }
+    }
+
     private static string BuildCacheKey(AuthenticationPayload payload) =>
         payload switch
         {

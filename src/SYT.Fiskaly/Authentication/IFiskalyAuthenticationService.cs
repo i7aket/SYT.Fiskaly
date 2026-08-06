@@ -30,4 +30,15 @@ public interface IFiskalyAuthenticationService : IDisposable
     /// <param name="cancellationToken">Forwarded to the HTTP call.</param>
     /// <returns>The parsed AuthenticationResponse from fiskaly.</returns>
     Task<AuthenticationResponse> AuthenticateAsync(IFiskalyCredentials credentials, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Drops the cached token for these credentials, so the next call authenticates afresh.
+    ///
+    /// <para>A token can stop being accepted long before it expires - fiskaly invalidate sessions on their side,
+    /// and a key deletion leaves issued tokens alive for up to 24 hours by their own documentation, which says
+    /// the reverse happens too. Without this the cache would keep handing out the rejected token until its
+    /// nominal expiry, and every retry would resend exactly what was just refused.</para>
+    /// </summary>
+    /// <param name="credentials">Whose token to drop; the configured default when null.</param>
+    void InvalidateToken(IFiskalyCredentials? credentials = null);
 }

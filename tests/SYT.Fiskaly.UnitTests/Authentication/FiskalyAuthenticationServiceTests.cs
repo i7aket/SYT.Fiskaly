@@ -139,6 +139,91 @@ public class FiskalyAuthenticationServiceTests
         Assert.Equal("7b3e4f8a-1234-4abc-9def-123456789012", first.Claims.OrganizationId!.Value.ToString());
     }
 
+    /// <summary>
+    /// A token can stop being accepted long before it expires. Without eviction the cache keeps handing out the
+    /// rejected one until its nominal expiry, so every retry re-sends exactly what the provider just refused -
+    /// which is what fiskaly's "on 401 simply reauthorize" guidance rules out.
+    /// </summary>
+    [Trait("Category", "Unit")]
+    [Fact]
+    public async Task InvalidateToken_ForcesTheNextCallToAuthenticateAgain()
+    {
+        MockHttpMessageHandler mockHttp = new MockHttpMessageHandler();
+        FakeTimeProvider fakeTime = new FakeTimeProvider(new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero));
+
+        int callCount = 0;
+        mockHttp.When("*/auth")
+            .Respond(_ =>
+            {
+                callCount++;
+                AuthenticationResponse response = new AuthenticationResponse
+                {
+                    AccessToken = AccessToken.From(SampleAccessToken),
+                    RefreshToken = RefreshToken.From(SampleRefreshToken),
+                    ExpiresIn = 3600
+                };
+
+                return new StringContent(
+                    JsonSerializer.Serialize(response), System.Text.Encoding.UTF8, "application/json");
+            });
+
+        FiskalyAuthenticationService service = CreateService(mockHttp, fakeTime);
+
+        ApiKeyCredentials credentials = new ApiKeyCredentials(
+            ApiKey.From(ValidApiKey),
+            ApiSecret.From(ValidApiSecret));
+
+        await service.GetAccessTokenAsync(credentials);
+        await service.GetAccessTokenAsync(credentials);
+        Assert.Equal(1, callCount);
+
+        service.InvalidateToken(credentials);
+
+        await service.GetAccessTokenAsync(credentials);
+        Assert.Equal(2, callCount);
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public async Task InvalidateToken_LeavesOtherCredentialsAlone()
+    {
+        MockHttpMessageHandler mockHttp = new MockHttpMessageHandler();
+        FakeTimeProvider fakeTime = new FakeTimeProvider(new DateTimeOffset(2025, 1, 1, 12, 0, 0, TimeSpan.Zero));
+
+        int callCount = 0;
+        mockHttp.When("*/auth")
+            .Respond(_ =>
+            {
+                callCount++;
+                AuthenticationResponse response = new AuthenticationResponse
+                {
+                    AccessToken = AccessToken.From(SampleAccessToken),
+                    RefreshToken = RefreshToken.From(SampleRefreshToken),
+                    ExpiresIn = 3600
+                };
+
+                return new StringContent(
+                    JsonSerializer.Serialize(response), System.Text.Encoding.UTF8, "application/json");
+            });
+
+        FiskalyAuthenticationService service = CreateService(mockHttp, fakeTime);
+
+        ApiKeyCredentials first = new ApiKeyCredentials(ApiKey.From(ValidApiKey), ApiSecret.From(ValidApiSecret));
+        ApiKeyCredentials second = new ApiKeyCredentials(
+            ApiKey.From("test_9zvm4bcdefghijklmnopqrstuvwxyz1234"),
+            ApiSecret.From("9bWYTaEsjeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"));
+
+        await service.GetAccessTokenAsync(first);
+        await service.GetAccessTokenAsync(second);
+        Assert.Equal(2, callCount);
+
+        // One tenant's rejected token must not cost every other tenant a round trip.
+        service.InvalidateToken(first);
+
+        await service.GetAccessTokenAsync(second);
+        Assert.Equal(2, callCount);
+    }
+
     [Trait("Category", "Unit")]
     [Fact]
     public async Task GetAccessTokenAsync_UsesCachedToken_WhenNotExpired()

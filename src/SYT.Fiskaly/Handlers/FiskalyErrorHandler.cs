@@ -11,6 +11,9 @@ public class FiskalyErrorHandler(
     JsonSerializerOptions jsonOptions,
     FiskalyMetrics metrics) : DelegatingHandler
 {
+    /// <summary>Floor for a Retry-After that resolves to zero or a negative interval (past date, clock skew).</summary>
+    private static readonly TimeSpan MinimumRetryAfter = TimeSpan.FromSeconds(1);
+
     private readonly ILogger<FiskalyErrorHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly JsonSerializerOptions _jsonOptions = jsonOptions ?? throw new ArgumentNullException(nameof(jsonOptions));
     private readonly FiskalyMetrics _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
@@ -31,7 +34,7 @@ public class FiskalyErrorHandler(
 
         (FiskalyErrorCode errorCode, FiskalyErrorResponse? errorDetails) = ParseErrorResponse(responseBody, response.StatusCode);
 
-        Metadata metadata = ErrorCodeMetadata.Get(errorCode);
+        Metadata metadata = ErrorCodeMetadata.Get(errorCode, response.StatusCode);
 
         string correlationId = ExtractCorrelationId(request);
 
@@ -52,23 +55,25 @@ public class FiskalyErrorHandler(
 
         RecordErrorMetrics(errorCode, metadata.Category, operation, response.StatusCode, stopwatch.Elapsed.TotalSeconds);
 
+        // Read wherever the header is present, not only on 429: fiskaly send Retry-After with 503 as well, and
+        // the interval they name is the one worth waiting - a category backoff guessed by the SDK is not.
         TimeSpan? retryAfter = null;
-        if (response.StatusCode == HttpStatusCode.TooManyRequests)
+        if (response.Headers.RetryAfter != null)
         {
-            if (response.Headers.RetryAfter != null)
+            if (response.Headers.RetryAfter.Delta.HasValue)
             {
-                if (response.Headers.RetryAfter.Delta.HasValue)
-                {
-                    retryAfter = response.Headers.RetryAfter.Delta.Value;
-                }
-                else if (response.Headers.RetryAfter.Date.HasValue)
-                {
-                    retryAfter = response.Headers.RetryAfter.Date.Value - DateTimeOffset.UtcNow;
-                    if (retryAfter < TimeSpan.Zero)
-                    {
-                        retryAfter = TimeSpan.Zero; // Past date → retry immediately
-                    }
-                }
+                retryAfter = response.Headers.RetryAfter.Delta.Value;
+            }
+            else if (response.Headers.RetryAfter.Date.HasValue)
+            {
+                retryAfter = response.Headers.RetryAfter.Date.Value - DateTimeOffset.UtcNow;
+            }
+
+            // A Date already in the past, or clock skew, would otherwise mean "retry immediately" against a
+            // server that just asked us to wait - which is how a rate limit turns into a tighter loop.
+            if (retryAfter is { } value && value < MinimumRetryAfter)
+            {
+                retryAfter = MinimumRetryAfter;
             }
         }
 
