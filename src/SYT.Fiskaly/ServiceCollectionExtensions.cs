@@ -155,6 +155,13 @@ public static class ServiceCollectionExtensions
         string clientName,
         Func<FiskalyConfiguration, FiskalyClientConfiguration> configSelector)
     {
+        // JwtAuthHandler stays OUTSIDE the resilience pipeline, and that is a measured decision rather than an
+        // oversight. Moving it inside lets each retry attach a freshly fetched token, which would heal a 401
+        // within the same call - but it also routes token acquisition through Polly, and the integration suite
+        // shows what that costs: a permanent 404 stops failing immediately and the circuit breaker stops
+        // opening on consecutive failures, because auth exceptions now feed both. Healing one call sooner is
+        // not worth changing how every other failure behaves; the eviction on 401 in that handler makes the
+        // NEXT call authenticate afresh, which is what fiskaly's "simply reauthorize" needs.
         return builder
             .AddHttpMessageHandler<FiskalyBaseUrlHandler>()
             .AddHttpMessageHandler<JwtAuthHandler>()

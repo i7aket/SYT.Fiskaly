@@ -302,10 +302,83 @@ internal static class ErrorCodeMetadata
             HttpStatusCode.BadRequest,
             "Validate request parameters, check API documentation"),
 
+        FiskalyErrorCode.E_CERTIFICATE_EXPIRED => new(
+            FiskalyErrorCategory.Permanent,
+            false,
+            (HttpStatusCode)423, // 423 Locked
+            "The TSS certificate has expired: create a replacement TSS and register its clients anew"),
+
+        FiskalyErrorCode.E_NOT_FOUND => new(
+            FiskalyErrorCategory.Permanent,
+            false,
+            HttpStatusCode.NotFound,
+            "Check the request path and resource identifiers"),
+
+        FiskalyErrorCode.SMAERS_GATEWAY_ERROR_PRECONDITION_UNEXPORTED_LOGS => new(
+            FiskalyErrorCategory.Infrastructure,
+            true,
+            HttpStatusCode.BadGateway,
+            "The security module holds unexported logs; fiskaly ask for a retry"),
+
+        FiskalyErrorCode.ERROR_IDENTIFY_ERS => new(
+            FiskalyErrorCategory.Infrastructure,
+            true,
+            HttpStatusCode.BadGateway,
+            "The gateway could not identify the ERS; fiskaly ask for a retry"),
+
         _ => new(
             FiskalyErrorCategory.Permanent,
             false,
             HttpStatusCode.InternalServerError,
             "Unknown error code - update SDK or contact support")
     };
+
+    /// <summary>
+    /// Classification for a response whose <c>code</c> the SDK does not recognise, decided by HTTP status.
+    ///
+    /// <para>Classifying by code alone made every unknown code permanent and non-retryable, which inverts what
+    /// the specification asks for exactly where it matters: 5xx "can be considered temporary … may safely
+    /// retry", 499 "can, and should, be retried", 429 "wait for Retry-After and retry". Those are precisely the
+    /// responses least likely to carry a code the SDK knows - a gateway 502 or a bare 503 often carries no body
+    /// at all - so the SDK refused to retry the failures fiskaly designed to be retried.</para>
+    ///
+    /// <para>The status is the one piece of information every response has, and the specification's retry rules
+    /// are written in terms of it. An unrecognised code therefore stops being a verdict and becomes what it
+    /// really is: a missing label on a response the status already describes.</para>
+    /// </summary>
+    public static Metadata ForUnrecognizedCode(HttpStatusCode statusCode) => (int)statusCode switch
+    {
+        429 => new(
+            FiskalyErrorCategory.Transient,
+            true,
+            statusCode,
+            "Rate limited: wait for the Retry-After interval and repeat the request"),
+
+        // 499 is the middleware's own "the client closed the connection": the request may well have been
+        // applied server-side, so the outcome is unknown and the caller must reconcile rather than assume.
+        499 => new(
+            FiskalyErrorCategory.Transient,
+            true,
+            statusCode,
+            "The connection closed before the response arrived; the outcome is unknown - retry and reconcile"),
+
+        >= 500 => new(
+            FiskalyErrorCategory.Infrastructure,
+            true,
+            statusCode,
+            "Provider-side failure; safe to retry with exponential backoff"),
+
+        _ => new(
+            FiskalyErrorCategory.Permanent,
+            false,
+            statusCode,
+            "Unknown error code - update SDK or contact support")
+    };
+
+    /// <summary>
+    /// Metadata for a parsed response: the code decides when the SDK knows it, the status decides when it does
+    /// not. See <see cref="ForUnrecognizedCode"/>.
+    /// </summary>
+    public static Metadata Get(FiskalyErrorCode errorCode, HttpStatusCode statusCode) =>
+        errorCode == FiskalyErrorCode.Unknown ? ForUnrecognizedCode(statusCode) : Get(errorCode);
 }

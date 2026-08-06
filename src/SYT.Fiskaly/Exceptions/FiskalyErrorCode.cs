@@ -56,5 +56,30 @@ public enum FiskalyErrorCode
     E_FAILED_SCHEMA_VALIDATION,
     E_PARAMETER_MISMATCH,
     E_LOG_NOT_FOUND,
-    E_CSPL_NOT_FOUND
+    E_CSPL_NOT_FOUND,
+
+    /// <summary>
+    /// 423 Locked. The TSS certificate has passed its validity window; fiskaly answer this to every operation
+    /// on that TSS. Recovery is a replacement TSS with newly registered clients - nothing about the existing
+    /// one can be repaired, so this must never be retried.
+    /// </summary>
+    E_CERTIFICATE_EXPIRED,
+
+    /// <summary>
+    /// Generic 404 from the middleware, observed live on paths that do not exist. Documented nowhere in the
+    /// 2.1.35 specification, which is why it used to fall through to <see cref="Unknown"/>.
+    /// </summary>
+    E_NOT_FOUND,
+
+    /// <summary>
+    /// 502 from the SMAERS gateway: the security module still holds unexported logs. fiskaly's guidance is to
+    /// retry.
+    /// </summary>
+    SMAERS_GATEWAY_ERROR_PRECONDITION_UNEXPORTED_LOGS,
+
+    /// <summary>
+    /// 502 from the SMAERS gateway: the ERS could not be identified for this request. fiskaly's guidance is to
+    /// retry.
+    /// </summary>
+    ERROR_IDENTIFY_ERS
 }

@@ -1332,7 +1332,7 @@ public class FiskalyErrorHandlerTests : IDisposable
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task SendAsync_WithRetryAfterPastDate_ReturnsZeroTimeSpan()
+    public async Task SendAsync_WithRetryAfterPastDate_FloorsTheIntervalInsteadOfRetryingImmediately()
     {
         // Arrange
         FiskalyErrorResponse errorResponse = new FiskalyErrorResponse
@@ -1365,9 +1365,11 @@ public class FiskalyErrorHandlerTests : IDisposable
         FiskalyApiException exception = await Assert.ThrowsAsync<FiskalyApiException>(
             () => _invoker.SendAsync(request, CancellationToken.None));
 
-        // Past date should return TimeSpan.Zero (retry immediately)
+        // A Retry-After already in the past used to mean "retry immediately", which turns the one response that
+        // asks us to slow down into a tighter loop. Clock skew alone produces this. The interval is floored at
+        // one second instead.
         Assert.NotNull(exception.RetryAfter);
-        Assert.Equal(TimeSpan.Zero, exception.RetryAfter.Value);
+        Assert.Equal(TimeSpan.FromSeconds(1), exception.RetryAfter.Value);
     }
 
     // ============================================================================
