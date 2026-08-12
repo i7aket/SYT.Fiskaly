@@ -163,6 +163,19 @@ public sealed class ExportRequest : ExportRequestBase
         {
             throw new FiskalyValidationException("End date cannot be earlier than start date.");
         }
+
+        // The spec types both dates as "integer, minimum: 0" - Unix seconds. A DateTimeOffset before the epoch
+        // serialises to a negative number, which is out of range; refusing here names the parameter instead of
+        // letting fiskaly answer with a generic 400 about a value it will not echo back.
+        if (StartDate.HasValue && StartDate.Value.ToUnixTimeSeconds() < 0)
+        {
+            throw new FiskalyValidationException("Start date cannot be earlier than 1970-01-01 UTC.");
+        }
+
+        if (EndDate.HasValue && EndDate.Value.ToUnixTimeSeconds() < 0)
+        {
+            throw new FiskalyValidationException("End date cannot be earlier than 1970-01-01 UTC.");
+        }
     }
 
     /// <summary>

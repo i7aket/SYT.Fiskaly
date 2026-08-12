@@ -122,6 +122,29 @@ public class ExportRequestTests
         Assert.Throws<FiskalyValidationException>(() => Query(request));
     }
 
+    /// <summary>
+    /// The spec types both dates as <c>integer, minimum: 0</c>. A pre-epoch DateTimeOffset serialises to a
+    /// negative number, which is out of range — and the value the caller would have to debug is one fiskaly
+    /// never echoes back.
+    /// </summary>
+    [Fact]
+    public void DateBeforeTheUnixEpoch_IsRefused()
+    {
+        ExportRequest start = new() { StartDate = new DateTimeOffset(1969, 12, 31, 0, 0, 0, TimeSpan.Zero) };
+        ExportRequest end = new() { EndDate = new DateTimeOffset(1969, 12, 31, 0, 0, 0, TimeSpan.Zero) };
+
+        Assert.Throws<FiskalyValidationException>(() => Query(start));
+        Assert.Throws<FiskalyValidationException>(() => Query(end));
+    }
+
+    [Fact]
+    public void TheEpochItself_IsAccepted()
+    {
+        Dictionary<string, string?> query = Query(new ExportRequest { StartDate = DateTimeOffset.UnixEpoch });
+
+        Assert.Equal("0", query["start_date"]);
+    }
+
     // --- client_id exclusivity: the defect this collapse exists to close ---
 
     [Fact]
