@@ -147,7 +147,17 @@ public abstract class FiskalyIntegrationTestBase : IClassFixture<FiskalyBaseTest
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
             ListTssResponse allTss = await Fixture.TssClient.ListTssAsync();
-            int activeCount = allTss.Data?.Count(t => t.State != TssState.Disabled) ?? 0;
+            // fiskaly's quota counts TSS that still occupy a slot, and only CREATED, UNINITIALIZED and
+            // INITIALIZED do. Everything else is terminal: DISABLED, DELETED, DEFECTIVE and EVICTED are all
+            // finished, and none of them can be revived.
+            //
+            // This used to read `State != Disabled`, which meant a DELETED instance was counted as active
+            // forever. Test runs never remove their TSS - they disable and then delete them - so the count
+            // grew with every run until it passed 5 and every integration test in the repository failed at
+            // fixture setup with "100/5 active TSS". The suite was unrunnable, and the message pointed at a
+            // quota that was in fact completely free.
+            int activeCount = allTss.Data?.Count(t =>
+                t.State is TssState.Created or TssState.Uninitialized or TssState.Initialized) ?? 0;
 
             if (activeCount < 5)
             {
