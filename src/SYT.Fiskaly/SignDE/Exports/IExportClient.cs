@@ -1,5 +1,4 @@
 
-using SYT.Fiskaly.SignDE.Exports.Dsfinvk;
 using SYT.Fiskaly.SignDE.Exports.Models;
 using SYT.Fiskaly.SignDE.Exports.Responses;
 using SYT.Fiskaly.SignDE.Exports.ValueObjects;
@@ -14,30 +13,18 @@ namespace SYT.Fiskaly.SignDE.Exports;
 public interface IExportClient
 {
     /// <summary>
-    /// Calls PUT /api/v2/tss/{tss_id}/export/{export_id} with a DsfinvkFullExportRequest payload.
+    /// Calls PUT /api/v2/tss/{tss_id}/export/{export_id}.
     /// </summary>
-    Task<ExportJob> TriggerFullExportAsync(
+    /// <remarks>
+    /// One method for one endpoint. fiskaly models the filter as a single flat querystring of nine optional
+    /// parameters; the three methods that stood here until rc.8 were an SDK invention, and two of them emitted
+    /// identical requests. Use <see cref="Models.ExportRequest.ForClient"/> for a client-scoped export, which
+    /// is the only variant fiskaly treats specially.
+    /// </remarks>
+    Task<ExportJob> TriggerExportAsync(
         TssId tssId,
         ExportId exportId,
-        DsfinvkFullExportRequest request,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Calls PUT /api/v2/tss/{tss_id}/export/{export_id} for a DsfinvkClientExportRequest.
-    /// </summary>
-    Task<ExportJob> TriggerClientExportAsync(
-        TssId tssId,
-        ExportId exportId,
-        DsfinvkClientExportRequest request,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Calls PUT /api/v2/tss/{tss_id}/export/{export_id} for a DsfinvkLogExportRequest.
-    /// </summary>
-    Task<ExportJob> TriggerLogExportAsync(
-        TssId tssId,
-        ExportId exportId,
-        DsfinvkLogExportRequest request,
+        ExportRequest request,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -49,12 +36,16 @@ public interface IExportClient
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Calls GET /api/v2/tss/{tss_id}/export/{export_id}/file to download an archive and optionally parse it with a custom DSFinV-K strategy.
+    /// Calls GET /api/v2/tss/{tss_id}/export/{export_id}/file and returns the archive verbatim.
     /// </summary>
-    Task<DsfinvkArchive> DownloadExportAsync(
+    /// <remarks>
+    /// The bytes are not parsed. fiskaly describes the payload as the TAR containing the SMAERS
+    /// initialization information, the signed log messages and the certificates to verify them — TSE records,
+    /// not DSFinV-K tables. A caller archiving them for the ten-year duty must keep what the provider sent.
+    /// </remarks>
+    Task<ExportArchive> DownloadExportAsync(
         TssId tssId,
         ExportId exportId,
-        IDsfinvkVersionStrategy? strategy = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

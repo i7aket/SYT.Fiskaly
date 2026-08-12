@@ -3,8 +3,8 @@ using SYT.Fiskaly.IntegrationTests.Base;
 using SYT.Fiskaly.SignDE.Admin.Requests;
 using SYT.Fiskaly.SignDE.Admin.ValueObjects;
 using SYT.Fiskaly.SignDE.Common;
-using SYT.Fiskaly.SignDE.Exports.Dsfinvk;
 using SYT.Fiskaly.SignDE.Exports.Enums;
+using SYT.Fiskaly.SignDE.Exports;
 using SYT.Fiskaly.SignDE.Exports.Models;
 using SYT.Fiskaly.SignDE.Exports.Responses;
 using SYT.Fiskaly.SignDE.Exports.ValueObjects;
@@ -26,9 +26,9 @@ namespace SYT.Fiskaly.IntegrationTests.SignDE;
 ///
 /// <para><strong>Endpoints Tested</strong>:</para>
 /// <list type="bullet">
-///   <item><description>POST /tss/{tss_id}/export/{export_id}/full - TriggerFullExportAsync</description></item>
-///   <item><description>POST /tss/{tss_id}/export/{export_id}/client - TriggerClientExportAsync</description></item>
-///   <item><description>POST /tss/{tss_id}/export/{export_id}/log - TriggerLogExportAsync</description></item>
+///   <item><description>POST /tss/{tss_id}/export/{export_id}/full - TriggerExportAsync</description></item>
+///   <item><description>POST /tss/{tss_id}/export/{export_id}/client - TriggerExportAsync</description></item>
+///   <item><description>POST /tss/{tss_id}/export/{export_id}/log - TriggerExportAsync</description></item>
 ///   <item><description>GET /tss/{tss_id}/export/{export_id} - GetExportAsync</description></item>
 ///   <item><description>GET /tss/{tss_id}/export/{export_id}.tar - DownloadExportAsync</description></item>
 ///   <item><description>DELETE /tss/{tss_id}/export/{export_id} - CancelExportAsync</description></item>
@@ -66,8 +66,8 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
         try
         {
             // Act
-            DsfinvkFullExportRequest exportRequest = new DsfinvkFullExportRequest();
-            ExportJob response = await Fixture.ExportClient.TriggerFullExportAsync(TssId, exportId, exportRequest);
+            ExportRequest exportRequest = new ExportRequest();
+            ExportJob response = await Fixture.ExportClient.TriggerExportAsync(TssId, exportId, exportRequest);
 
             // Assert
             response.Should().NotBeNull();
@@ -99,8 +99,8 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
 
         try
         {
-            DsfinvkFullExportRequest exportRequest = new DsfinvkFullExportRequest();
-            await Fixture.ExportClient.TriggerFullExportAsync(TssId, exportId, exportRequest);
+            ExportRequest exportRequest = new ExportRequest();
+            await Fixture.ExportClient.TriggerExportAsync(TssId, exportId, exportRequest);
 
             Console.WriteLine($"Polling export {exportId} until completed...");
 
@@ -158,8 +158,8 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
 
         try
         {
-            DsfinvkFullExportRequest exportRequest = new DsfinvkFullExportRequest();
-            await Fixture.ExportClient.TriggerFullExportAsync(TssId, exportId, exportRequest);
+            ExportRequest exportRequest = new ExportRequest();
+            await Fixture.ExportClient.TriggerExportAsync(TssId, exportId, exportRequest);
 
             // Poll until completed
             int maxAttempts = 30;
@@ -190,7 +190,7 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
             Console.WriteLine($"Downloading export {exportId}...");
 
             // Act - Download TAR archive
-            DsfinvkArchive archive = await Fixture.ExportClient.DownloadExportAsync(TssId, exportId);
+            ExportArchive archive = await Fixture.ExportClient.DownloadExportAsync(TssId, exportId);
 
             // Assert
             archive.Should().NotBeNull();
@@ -224,8 +224,8 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
         try
         {
             // Act
-            DsfinvkClientExportRequest exportRequest = new DsfinvkClientExportRequest(ClientId);
-            ExportJob response = await Fixture.ExportClient.TriggerClientExportAsync(TssId, exportId, exportRequest);
+            ExportRequest exportRequest = ExportRequest.ForClient(ClientId);
+            ExportJob response = await Fixture.ExportClient.TriggerExportAsync(TssId, exportId, exportRequest);
 
             // Assert
             response.Should().NotBeNull();
@@ -260,8 +260,8 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
         try
         {
             // Act
-            DsfinvkLogExportRequest exportRequest = new DsfinvkLogExportRequest();
-            ExportJob response = await Fixture.ExportClient.TriggerLogExportAsync(TssId, exportId, exportRequest);
+            ExportRequest exportRequest = new ExportRequest();
+            ExportJob response = await Fixture.ExportClient.TriggerExportAsync(TssId, exportId, exportRequest);
 
             // Assert
             response.Should().NotBeNull();
@@ -293,8 +293,8 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
 
         try
         {
-            DsfinvkFullExportRequest exportRequest = new DsfinvkFullExportRequest();
-            await Fixture.ExportClient.TriggerFullExportAsync(TssId, exportId, exportRequest);
+            ExportRequest exportRequest = new ExportRequest();
+            await Fixture.ExportClient.TriggerExportAsync(TssId, exportId, exportRequest);
 
             Console.WriteLine($"Export {exportId} triggered, attempting cancellation...");
 
@@ -349,8 +349,8 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
 
         try
         {
-            DsfinvkFullExportRequest exportRequest = new DsfinvkFullExportRequest();
-            await Fixture.ExportClient.TriggerFullExportAsync(TssId, exportId, exportRequest);
+            ExportRequest exportRequest = new ExportRequest();
+            await Fixture.ExportClient.TriggerExportAsync(TssId, exportId, exportRequest);
 
             Console.WriteLine($"Listing exports for TSS: {TssId}");
 
@@ -387,8 +387,8 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
 
         try
         {
-            DsfinvkFullExportRequest exportRequest = new DsfinvkFullExportRequest();
-            await Fixture.ExportClient.TriggerFullExportAsync(TssId, exportId, exportRequest);
+            ExportRequest exportRequest = new ExportRequest();
+            await Fixture.ExportClient.TriggerExportAsync(TssId, exportId, exportRequest);
 
             Console.WriteLine($"Listing all exports across all TSS...");
 
@@ -425,8 +425,8 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
 
         try
         {
-            DsfinvkFullExportRequest exportRequest = new DsfinvkFullExportRequest();
-            await Fixture.ExportClient.TriggerFullExportAsync(TssId, exportId, exportRequest);
+            ExportRequest exportRequest = new ExportRequest();
+            await Fixture.ExportClient.TriggerExportAsync(TssId, exportId, exportRequest);
 
             MetadataCollection metadata = MetadataCollection.Empty
                 .Add("environment", "integration-test")
@@ -472,8 +472,8 @@ public class ExportWorkflowTests : FiskalyIntegrationTestBase
 
         try
         {
-            DsfinvkFullExportRequest exportRequest = new DsfinvkFullExportRequest();
-            await Fixture.ExportClient.TriggerFullExportAsync(TssId, exportId, exportRequest);
+            ExportRequest exportRequest = new ExportRequest();
+            await Fixture.ExportClient.TriggerExportAsync(TssId, exportId, exportRequest);
 
             string key1 = "export-test-key";
             string value1 = "export-test-value";

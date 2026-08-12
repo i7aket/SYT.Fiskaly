@@ -1,7 +1,11 @@
 # Fiskaly SIGN DE API Changelog
 
-**API Version:** v2.1.35
+**API Version:** v2.1.35 (see note)
 **Last Updated:** 2025-10-24
+
+> Note: the OpenAPI specification shipped beside this file is **v2.2.2**. fiskaly did not publish changelog
+> entries for 2.1.35 -> 2.2.2; a structural diff of the two specs shows the export surface unchanged, with
+> `E_CERTIFICATE_EXPIRED` added to `cancelExport`'s error codes as the only functional delta.
 **Source:** OpenAPI Specification v2.1.35
 
 ---

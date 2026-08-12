@@ -7,7 +7,10 @@ namespace SYT.Fiskaly.SignDE.Exports.ValueObjects;
 public readonly record struct SignatureCounter : IParsable<SignatureCounter>
 {
     public const long Min = 0;
-    public const long Max = 9_007_199_254_740_991; // per OpenAPI (max safe integer)
+    // NOT a spec limit: the OpenAPI gives signature counters only {"type":"string","pattern":"^\\d+$"} with
+    // no maximum. 2^53-1 is JavaScript's safe-integer ceiling, which fiskaly's backend shares, so a larger
+    // value would not survive the round trip even though the pattern admits it.
+    public const long Max = 9_007_199_254_740_991;
 
     public long Value { get; }
 

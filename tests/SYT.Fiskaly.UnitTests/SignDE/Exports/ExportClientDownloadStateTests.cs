@@ -9,7 +9,6 @@ using SYT.Fiskaly.Exceptions;
 using SYT.Fiskaly.Http;
 using SYT.Fiskaly.SignDE.Common;
 using SYT.Fiskaly.SignDE.Exports;
-using SYT.Fiskaly.SignDE.Exports.Dsfinvk;
 using SYT.Fiskaly.SignDE.Exports.Enums;
 using SYT.Fiskaly.SignDE.Exports.Models;
 using SYT.Fiskaly.SignDE.Exports.ValueObjects;
@@ -100,7 +99,6 @@ public class ExportClientDownloadStateTests
             httpClient,
             new FiskalyHttpRequestExecutor(_jsonOptions, NullLogger<FiskalyHttpRequestExecutor>.Instance),
             NullLogger<ExportClient>.Instance,
-            _jsonOptions,
-            new DsfinvkV2SegmentStrategy());
+            _jsonOptions);
     }
 }

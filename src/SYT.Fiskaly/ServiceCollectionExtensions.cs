@@ -16,7 +16,6 @@ using SYT.Fiskaly.SignDE.Admin;
 using SYT.Fiskaly.SignDE.Clients;
 using SYT.Fiskaly.SignDE.Common;
 using SYT.Fiskaly.SignDE.Exports;
-using SYT.Fiskaly.SignDE.Exports.Dsfinvk;
 using SYT.Fiskaly.SignDE.Transactions;
 using SYT.Fiskaly.SignDE.Transactions.Serialization;
 using SYT.Fiskaly.SignDE.Tss;
@@ -74,8 +73,6 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton(jsonOptions);
 
-        services.AddSingleton<IDsfinvkVersionStrategy, DsfinvkV2SegmentStrategy>();
-
         services.AddSingleton<FiskalyMetrics>();
 
         #endregion Core Infrastructure
@@ -120,9 +117,7 @@ public static class ServiceCollectionExtensions
         services.AddFiskalyScopedClient<ITransactionClient, TransactionClient>("TransactionClient");
 
         services.AddFiskalyNamedClient("ExportClient", cfg => cfg.ExportClient);
-        services.AddFiskalyScopedClient<IExportClient, ExportClient>(
-            "ExportClient",
-            sp => [sp.GetRequiredService<IDsfinvkVersionStrategy>()]);
+        services.AddFiskalyScopedClient<IExportClient, ExportClient>("ExportClient");
 
         services.AddFiskalyManagementClient<IOrganizationClient, OrganizationClient>(
             "OrganizationClient", cfg => cfg.OrganizationClient);

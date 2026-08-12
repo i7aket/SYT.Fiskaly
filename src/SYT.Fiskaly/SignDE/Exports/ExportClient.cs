@@ -1,7 +1,6 @@
 using System.Text.Json;
 using SYT.Fiskaly.Exceptions;
 using SYT.Fiskaly.Http;
-using SYT.Fiskaly.SignDE.Exports.Dsfinvk;
 using SYT.Fiskaly.SignDE.Exports.Enums;
 using SYT.Fiskaly.SignDE.Exports.Models;
 using SYT.Fiskaly.SignDE.Exports.Responses;
@@ -15,72 +14,41 @@ public class ExportClient(
     HttpClient httpClient,
     FiskalyHttpRequestExecutor executor,
     ILogger<ExportClient> logger,
-    JsonSerializerOptions serializerOptions,
-    IDsfinvkVersionStrategy dsfinvkStrategy)
+    JsonSerializerOptions serializerOptions)
     : IExportClient
 {
     private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     private readonly FiskalyHttpRequestExecutor _executor = executor ?? throw new ArgumentNullException(nameof(executor));
     private readonly ILogger<ExportClient> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly JsonSerializerOptions _serializerOptions = serializerOptions ?? throw new ArgumentNullException(nameof(serializerOptions));
-    private readonly IDsfinvkVersionStrategy _dsfinvkStrategy = dsfinvkStrategy ?? throw new ArgumentNullException(nameof(dsfinvkStrategy));
 
-    public async Task<ExportJob> TriggerFullExportAsync(
+    public async Task<ExportJob> TriggerExportAsync(
         TssId tssId,
         ExportId exportId,
-        DsfinvkFullExportRequest request,
+        ExportRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        _logger.LogInformation("Triggering full DSFinV-K export {ExportId} for TSS {TssId} (StartDate: {StartDate}, EndDate: {EndDate}, ClientId: {ClientId})",
-            exportId.Value, tssId.Value, request.StartDate, request.EndDate, request.ClientId?.ToString() ?? "all");
+        // One method, because fiskaly has one endpoint and one query shape. The three that stood here until
+        // rc.8 differed only in their request type and a log string, and two of them built byte-identical
+        // query strings whenever only a counter range was set.
+        _logger.LogInformation(
+            "Triggering export {ExportId} for TSS {TssId} (Client: {ClientId}, StartDate: {StartDate}, "
+            + "EndDate: {EndDate}, SignatureCounters: {StartSignatureCounter}..{EndSignatureCounter})",
+            exportId.Value,
+            tssId.Value,
+            request.ClientId?.ToString() ?? "all",
+            request.StartDate,
+            request.EndDate,
+            request.StartSignatureCounter?.Value,
+            request.EndSignatureCounter?.Value);
 
         string url = request.BuildUrl($"tss/{tssId}/export/{exportId}");
 
         ExportJob exportResponse = await _executor.ExecutePutAsync<ExportJob>(_httpClient, url, cancellationToken).ConfigureAwait(false);
 
-        _logger.LogInformation("Full export triggered: {ExportId}, State: {State}", exportResponse.Id.Value, exportResponse.State);
-
-        return exportResponse;
-    }
-
-    public async Task<ExportJob> TriggerClientExportAsync(
-        TssId tssId,
-        ExportId exportId,
-        DsfinvkClientExportRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        _logger.LogInformation("Triggering client-specific DSFinV-K export {ExportId} for TSS {TssId}, Client {ClientId}",
-            exportId.Value, tssId.Value, request.ClientId.ToString());
-
-        string url = request.BuildUrl($"tss/{tssId}/export/{exportId}");
-
-        ExportJob exportResponse = await _executor.ExecutePutAsync<ExportJob>(_httpClient, url, cancellationToken).ConfigureAwait(false);
-
-        _logger.LogInformation("Client export triggered: {ExportId}, State: {State}", exportResponse.Id.Value, exportResponse.State);
-
-        return exportResponse;
-    }
-
-    public async Task<ExportJob> TriggerLogExportAsync(
-        TssId tssId,
-        ExportId exportId,
-        DsfinvkLogExportRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        _logger.LogInformation("Triggering log DSFinV-K export {ExportId} for TSS {TssId}, TransactionNumber: {TransactionNumber}",
-            exportId.Value, tssId.Value, request.TransactionNumber?.ToString() ?? "all");
-
-        string url = request.BuildUrl($"tss/{tssId}/export/{exportId}");
-
-        ExportJob exportResponse = await _executor.ExecutePutAsync<ExportJob>(_httpClient, url, cancellationToken).ConfigureAwait(false);
-
-        _logger.LogInformation("Log export triggered: {ExportId}, State: {State}", exportResponse.Id.Value, exportResponse.State);
+        _logger.LogInformation("Export triggered: {ExportId}, State: {State}", exportResponse.Id.Value, exportResponse.State);
 
         return exportResponse;
     }
@@ -99,10 +67,9 @@ public class ExportClient(
         return exportResponse;
     }
 
-    public async Task<DsfinvkArchive> DownloadExportAsync(
+    public async Task<ExportArchive> DownloadExportAsync(
         TssId tssId,
         ExportId exportId,
-        IDsfinvkVersionStrategy? strategy = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Downloading export {ExportId} for TSS {TssId}", exportId.Value, tssId.Value);
@@ -126,9 +93,10 @@ public class ExportClient(
         using HttpResponseMessage response = await _httpClient.GetAsync($"tss/{tssId.Value}/export/{exportId.Value}/file", cancellationToken).ConfigureAwait(false);
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 
-        IDsfinvkVersionStrategy effectiveStrategy = strategy ?? _dsfinvkStrategy;
-
-        return await DsfinvkArchive.FromStreamAsync(exportId, stream, effectiveStrategy, cancellationToken).ConfigureAwait(false);
+        // The bytes are kept as sent. Parsing them here would buy nothing: the caller archiving a journal for
+        // ten years has to store what the provider sent, and .NET's TarReader treats a truncated archive as a
+        // complete one anyway, so a parse would not even prove the download finished.
+        return await ExportArchive.FromStreamAsync(exportId, stream, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<ExportJob> CancelExportAsync(
