@@ -5,10 +5,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Moq.Protected;
+using SYT.Fiskaly.Exceptions;
 using SYT.Fiskaly.Http;
 using SYT.Fiskaly.Common.Enums;
 using SYT.Fiskaly.SignDE.Exports;
-using SYT.Fiskaly.SignDE.Exports.Dsfinvk;
 using SYT.Fiskaly.SignDE.Exports.Enums;
 using SYT.Fiskaly.SignDE.Exports.Models;
 using SYT.Fiskaly.SignDE.Exports.Responses;
@@ -54,8 +54,7 @@ public class ExportClientTests
     /// </summary>
     private ExportClient CreateExportClient(
         HttpMessageHandler httpMessageHandler,
-        ILogger<ExportClient>? logger = null,
-        IDsfinvkVersionStrategy? dsfinvkStrategy = null)
+        ILogger<ExportClient>? logger = null)
     {
         HttpClient httpClient = new HttpClient(httpMessageHandler)
         {
@@ -67,14 +66,11 @@ public class ExportClientTests
             new Microsoft.Extensions.Logging.Abstractions.NullLogger<FiskalyHttpRequestExecutor>()
         );
 
-        IDsfinvkVersionStrategy strategy = dsfinvkStrategy ?? Mock.Of<IDsfinvkVersionStrategy>();
-
         return new ExportClient(
             httpClient,
             executor,
             logger ?? new Microsoft.Extensions.Logging.Abstractions.NullLogger<ExportClient>(),
-            _jsonOptions,
-            strategy
+            _jsonOptions
         );
     }
 
@@ -159,11 +155,10 @@ public class ExportClientTests
             new Microsoft.Extensions.Logging.Abstractions.NullLogger<FiskalyHttpRequestExecutor>()
         );
         NullLogger<ExportClient> logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<ExportClient>();
-        IDsfinvkVersionStrategy strategy = Mock.Of<IDsfinvkVersionStrategy>();
 
         // Act & Assert
         ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
-            new ExportClient(null!, executor, logger, _jsonOptions, strategy));
+            new ExportClient(null!, executor, logger, _jsonOptions));
 
         Assert.Equal("httpClient", exception.ParamName);
     }
@@ -174,11 +169,10 @@ public class ExportClientTests
         // Arrange
         HttpClient httpClient = new HttpClient();
         NullLogger<ExportClient> logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<ExportClient>();
-        IDsfinvkVersionStrategy strategy = Mock.Of<IDsfinvkVersionStrategy>();
 
         // Act & Assert
         ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
-            new ExportClient(httpClient, null!, logger, _jsonOptions, strategy));
+            new ExportClient(httpClient, null!, logger, _jsonOptions));
 
         Assert.Equal("executor", exception.ParamName);
     }
@@ -192,11 +186,10 @@ public class ExportClientTests
             _jsonOptions,
             new Microsoft.Extensions.Logging.Abstractions.NullLogger<FiskalyHttpRequestExecutor>()
         );
-        IDsfinvkVersionStrategy strategy = Mock.Of<IDsfinvkVersionStrategy>();
 
         // Act & Assert
         ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
-            new ExportClient(httpClient, executor, null!, _jsonOptions, strategy));
+            new ExportClient(httpClient, executor, null!, _jsonOptions));
 
         Assert.Equal("logger", exception.ParamName);
     }
@@ -211,42 +204,25 @@ public class ExportClientTests
             new Microsoft.Extensions.Logging.Abstractions.NullLogger<FiskalyHttpRequestExecutor>()
         );
         NullLogger<ExportClient> logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<ExportClient>();
-        IDsfinvkVersionStrategy strategy = Mock.Of<IDsfinvkVersionStrategy>();
 
         // Act & Assert
         ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
-            new ExportClient(httpClient, executor, logger, null!, strategy));
+            new ExportClient(httpClient, executor, logger, null!));
 
         Assert.Equal("serializerOptions", exception.ParamName);
     }
 
-    [Fact]
-    public void Constructor_WithNullDsfinvkStrategy_ThrowsArgumentNullException()
-    {
-        // Arrange
-        HttpClient httpClient = new HttpClient();
-        FiskalyHttpRequestExecutor executor = new FiskalyHttpRequestExecutor(
-            _jsonOptions,
-            new Microsoft.Extensions.Logging.Abstractions.NullLogger<FiskalyHttpRequestExecutor>()
-        );
-        NullLogger<ExportClient> logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<ExportClient>();
 
-        // Act & Assert
-        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
-            new ExportClient(httpClient, executor, logger, _jsonOptions, null!));
-
-        Assert.Equal("dsfinvkStrategy", exception.ParamName);
-    }
 
     #endregion
 
-    #region TriggerFullExportAsync Tests (4 tests)
+    #region TriggerExportAsync Tests
 
     [Fact]
-    public async Task TriggerFullExportAsync_WithValidRequest_ReturnsExportJob()
+    public async Task TriggerExportAsync_WithValidRequest_ReturnsExportJob()
     {
         // Arrange
-        DsfinvkFullExportRequest request = new DsfinvkFullExportRequest
+        ExportRequest request = new ExportRequest
         {
             StartDate = DateTimeOffset.UtcNow.AddDays(-7),
             EndDate = DateTimeOffset.UtcNow
@@ -267,7 +243,7 @@ public class ExportClientTests
         ExportClient client = CreateExportClient(mockHandler.Object);
 
         // Act
-        ExportJob result = await client.TriggerFullExportAsync(_testTssId, _testExportId, request);
+        ExportJob result = await client.TriggerExportAsync(_testTssId, _testExportId, request);
 
         // Assert
         Assert.NotNull(result);
@@ -286,7 +262,7 @@ public class ExportClientTests
     }
 
     [Fact]
-    public async Task TriggerFullExportAsync_WithNullRequest_ThrowsArgumentNullException()
+    public async Task TriggerExportAsync_WithNullRequest_ThrowsArgumentNullException()
     {
         // Arrange
         Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>();
@@ -294,47 +270,66 @@ public class ExportClientTests
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(async () =>
-            await client.TriggerFullExportAsync(_testTssId, _testExportId, null!));
+            await client.TriggerExportAsync(_testTssId, _testExportId, null!));
     }
 
+    /// <summary>
+    /// Until rc.8 this test set ClientId alongside a date range and expected the request to go out. fiskaly
+    /// documents that it ignores every other parameter when client_id is present, so what actually went out
+    /// was a client-scoped export the caller never asked for. The SDK now refuses the combination, and
+    /// ForClient is the way to ask for one client.
+    /// </summary>
     [Fact]
-    public async Task TriggerFullExportAsync_WithClientIdFilter_ReturnsExportJobWithClientId()
+    public async Task TriggerExportAsync_ForOneClient_SendsOnlyTheClientFilter()
     {
         // Arrange
-        DsfinvkFullExportRequest request = new DsfinvkFullExportRequest
-        {
-            StartDate = DateTimeOffset.UtcNow.AddDays(-7),
-            EndDate = DateTimeOffset.UtcNow,
-            ClientId = _testClientId
-        };
+        ExportRequest request = ExportRequest.ForClient(_testClientId);
 
         Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        HttpRequestMessage? captured = null;
         mockHandler.Protected()
             .Setup<Task<HttpResponseMessage>>("SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(CreateExportJobResponse(
-                _testExportId,
-                _testTssId,
-                ExportState.Pending,
-                request.StartDate,
-                request.EndDate,
-                _testClientId));
+            .Callback<HttpRequestMessage, CancellationToken>((r, _) => captured = r)
+            .ReturnsAsync(CreateExportJobResponse(_testExportId, _testTssId, ExportState.Pending));
 
         ExportClient client = CreateExportClient(mockHandler.Object);
 
         // Act
-        ExportJob result = await client.TriggerFullExportAsync(_testTssId, _testExportId, request);
+        ExportJob result = await client.TriggerExportAsync(_testTssId, _testExportId, request);
 
         // Assert
-        Assert.Equal(_testClientId, result.ClientId);
+        Assert.NotNull(result);
+        Assert.NotNull(captured);
+        string query = captured!.RequestUri!.Query;
+        Assert.Contains("client_id=", query, StringComparison.Ordinal);
+        Assert.DoesNotContain("start_date=", query, StringComparison.Ordinal);
+        Assert.DoesNotContain("end_date=", query, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task TriggerFullExportAsync_PropagatesCancellationToken()
+    public async Task TriggerExportAsync_ClientIdCombinedWithAnotherFilter_IsRefusedBeforeAnyHttpCall()
+    {
+        // MockBehavior.Strict with no setup: any HTTP call at all fails the test.
+        Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        ExportClient client = CreateExportClient(mockHandler.Object);
+
+        ExportRequest request = new ExportRequest
+        {
+            ClientId = _testClientId,
+            StartDate = DateTimeOffset.UtcNow.AddDays(-7)
+        };
+
+        await Assert.ThrowsAsync<FiskalyValidationException>(
+            () => client.TriggerExportAsync(_testTssId, _testExportId, request));
+    }
+
+    [Fact]
+    public async Task TriggerExportAsync_PropagatesCancellationToken()
     {
         // Arrange
-        DsfinvkFullExportRequest request = new DsfinvkFullExportRequest
+        ExportRequest request = new ExportRequest
         {
             StartDate = DateTimeOffset.UtcNow.AddDays(-7),
             EndDate = DateTimeOffset.UtcNow
@@ -354,163 +349,11 @@ public class ExportClientTests
 
         // Act & Assert
         await Assert.ThrowsAsync<TaskCanceledException>(async () =>
-            await client.TriggerFullExportAsync(_testTssId, _testExportId, request, cts.Token));
+            await client.TriggerExportAsync(_testTssId, _testExportId, request, cts.Token));
     }
 
     #endregion
 
-    #region TriggerClientExportAsync Tests (3 tests)
-
-    [Fact]
-    public async Task TriggerClientExportAsync_WithValidRequest_ReturnsExportJob()
-    {
-        // Arrange
-        DsfinvkClientExportRequest request = new DsfinvkClientExportRequest(_testClientId);
-
-        Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-        mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(CreateExportJobResponse(
-                _testExportId,
-                _testTssId,
-                ExportState.Pending,
-                clientId: _testClientId));
-
-        ExportClient client = CreateExportClient(mockHandler.Object);
-
-        // Act
-        ExportJob result = await client.TriggerClientExportAsync(_testTssId, _testExportId, request);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(_testExportId, result.Id);
-        Assert.Equal(_testTssId, result.TssId);
-        Assert.Equal(ExportState.Pending, result.State);
-        Assert.Equal(_testClientId, result.ClientId);
-
-        mockHandler.Protected().Verify("SendAsync",
-            Times.Once(),
-            ItExpr.Is<HttpRequestMessage>(req =>
-                req.Method == HttpMethod.Put &&
-                req.RequestUri!.ToString().Contains($"tss/{_testTssId}/export/{_testExportId}") &&
-                req.RequestUri!.ToString().Contains($"client_id={_testClientId}")),
-            ItExpr.IsAny<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task TriggerClientExportAsync_WithNullRequest_ThrowsArgumentNullException()
-    {
-        // Arrange
-        Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>();
-        ExportClient client = CreateExportClient(mockHandler.Object);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(async () =>
-            await client.TriggerClientExportAsync(_testTssId, _testExportId, null!));
-    }
-
-    [Fact]
-    public async Task TriggerClientExportAsync_PropagatesCancellationToken()
-    {
-        // Arrange
-        DsfinvkClientExportRequest request = new DsfinvkClientExportRequest(_testClientId);
-        CancellationTokenSource cts = new CancellationTokenSource();
-        cts.Cancel(); // Pre-cancel the token
-
-        Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-        mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.Is<CancellationToken>(ct => ct.IsCancellationRequested))
-            .ThrowsAsync(new TaskCanceledException());
-
-        ExportClient client = CreateExportClient(mockHandler.Object);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<TaskCanceledException>(async () =>
-            await client.TriggerClientExportAsync(_testTssId, _testExportId, request, cts.Token));
-    }
-
-    #endregion
-
-    #region TriggerLogExportAsync Tests (3 tests)
-
-    [Fact]
-    public async Task TriggerLogExportAsync_WithValidRequest_ReturnsExportJob()
-    {
-        // Arrange
-        DsfinvkLogExportRequest request = new DsfinvkLogExportRequest
-        {
-            TransactionNumber = TransactionSequenceNumber.From(1234)
-        };
-
-        Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-        mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(CreateExportJobResponse(
-                _testExportId,
-                _testTssId,
-                ExportState.Pending));
-
-        ExportClient client = CreateExportClient(mockHandler.Object);
-
-        // Act
-        ExportJob result = await client.TriggerLogExportAsync(_testTssId, _testExportId, request);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(_testExportId, result.Id);
-        Assert.Equal(_testTssId, result.TssId);
-        Assert.Equal(ExportState.Pending, result.State);
-
-        mockHandler.Protected().Verify("SendAsync",
-            Times.Once(),
-            ItExpr.Is<HttpRequestMessage>(req =>
-                req.Method == HttpMethod.Put &&
-                req.RequestUri!.ToString().Contains($"tss/{_testTssId}/export/{_testExportId}") &&
-                req.RequestUri!.ToString().Contains("transaction_number=1234")),
-            ItExpr.IsAny<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task TriggerLogExportAsync_WithNullRequest_ThrowsArgumentNullException()
-    {
-        // Arrange
-        Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>();
-        ExportClient client = CreateExportClient(mockHandler.Object);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(async () =>
-            await client.TriggerLogExportAsync(_testTssId, _testExportId, null!));
-    }
-
-    [Fact]
-    public async Task TriggerLogExportAsync_PropagatesCancellationToken()
-    {
-        // Arrange
-        DsfinvkLogExportRequest request = new DsfinvkLogExportRequest();
-        CancellationTokenSource cts = new CancellationTokenSource();
-        cts.Cancel(); // Pre-cancel the token
-
-        Mock<HttpMessageHandler> mockHandler = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-        mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.Is<CancellationToken>(ct => ct.IsCancellationRequested))
-            .ThrowsAsync(new TaskCanceledException());
-
-        ExportClient client = CreateExportClient(mockHandler.Object);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<TaskCanceledException>(async () =>
-            await client.TriggerLogExportAsync(_testTssId, _testExportId, request, cts.Token));
-    }
-
-    #endregion
 
     #region GetExportAsync Tests (3 tests)
 

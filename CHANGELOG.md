@@ -1,5 +1,48 @@
 # Changelog
 
+## [1.0.0-rc.8] - 2026-08-11
+
+### Changed (breaking)
+- `DsfinvkArchive` is now `ExportArchive`, and moves to `SYT.Fiskaly.SignDE.Exports`. The SIGN DE export
+  endpoints do not produce DSFinV-K data. fiskaly's own spec describes the payload as *"the SMAERS
+  initialization information, the signed log messages, and the certificates to verify them"*, and a real
+  archive holds 134 ASN.1 `.log` records, 3 X.509 certificates and one `info.csv` — no DSFinV-K CSVs at all.
+  DSFinV-K is a separate fiskaly product on a separate host (`dsfinvk.fiskaly.com`), and the word appears
+  nowhere in the SIGN DE spec's export paths or components.
+- `DsfinvkFullExportRequest`, `DsfinvkClientExportRequest`, `DsfinvkLogExportRequest` and
+  `DsfinvkExportRequestBase` collapse into one `ExportRequest`. fiskaly models the filter as a single flat
+  querystring of nine optional parameters (`TriggerExportsQuerystring`) with no variants; two of the three
+  classes emitted byte-identical requests whenever only a counter range was set.
+- `TriggerFullExportAsync`, `TriggerClientExportAsync` and `TriggerLogExportAsync` collapse into
+  `TriggerExportAsync`. All three called `PUT /api/v2/tss/{tss_id}/export/{export_id}` and differed only in a
+  log string.
+- `DownloadExportAsync` loses its `strategy` parameter and returns `ExportArchive`.
+
+### Fixed
+- `client_id` is enforced as exclusive. fiskaly documents that *"other query parameters will be ignored"* when
+  it is set, and `DsfinvkFullExportRequest` exposed it alongside dates and counter ranges — so a caller could
+  ask for one thing and receive another, permanently, with no error. Combining them is now refused, and
+  `ExportRequest.ForClient(clientId)` builds the client-scoped case in a shape that cannot violate the rule.
+- Request validation raises `FiskalyValidationException` (new, inside the `FiskalyException` hierarchy)
+  instead of `InvalidOperationException`. The three range checks that already existed escaped the catch every
+  consumer writes and surfaced as HTTP 500 — the same defect rc.7 fixed for downloads.
+
+### Removed
+- The DSFinV-K segment model: `DsfinvkSegment`, `DsfinvkSegmentType`, `IDsfinvkVersionStrategy`,
+  `DsfinvkV2SegmentStrategy`, `UnknownDsfinvkSegment`, `MasterDataSegment`, `TransactionSegment`,
+  `CashPointClosingSegment`. It classified archive entries by substring on the file name (`master`,
+  `transaction`, `receipt`, `tx`, `closing`, `cashpoint`, `cash_point`) and matched **none** of the 138
+  entries in the bundled sample — everything fell through to `UnknownDsfinvkSegment`, and the repository's own
+  test said so. `DsfinvkSegment.OpenJsonDocument()` parsed entry bytes as JSON, which can only throw on ASN.1
+  records and DER certificates.
+- The eager TAR parse on download. It was not the integrity check it appeared to be: .NET's `TarReader` treats
+  a truncated stream as end-of-archive, so a 50 %-truncated journal parsed cleanly as a valid archive.
+  Downloads now return the bytes verbatim, which is what an archived journal must be.
+
+### Unchanged
+- `SYT.Fiskaly.Dsfinvk.Enums` — `BusinessCaseType` (`GV_TYP`) and `DsfinvkPaymentType` (`ZAHLART_TYP`) are
+  genuine DSFinV-K taxonomy and are named correctly.
+
 ## [1.0.0-rc.7] - 2026-08-06
 
 ### Fixed

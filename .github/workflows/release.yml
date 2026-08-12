@@ -17,12 +17,17 @@ jobs:
   publish:
     runs-on: ubuntu-latest
 
+    # Only from main. The workflow is dispatched by hand and checks out whatever ref the operator picked, so
+    # without this it publishes from any branch - which is how 1.0.0-rc.7 reached nuget.org while main still
+    # said rc.6, leaving the published package on a commit no tag or branch pointed at.
+    if: github.ref == 'refs/heads/main'
+
     # Publishing is a deliberate act, not a side effect of merging. The environment adds a human gate, and the
     # trusted-publishing policy is bound to it, so a token can only be minted from a run that passed through it.
     environment: nuget
 
     permissions:
-      contents: read
+      contents: write  # tag the published commit
       id-token: write  # required for the OIDC token exchanged for a short-lived NuGet key
 
     env:
@@ -71,3 +76,14 @@ jobs:
           dotnet nuget push "./artifacts/*.nupkg" \
             --source "https://api.nuget.org/v3/index.json" \
             --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
+
+      # A published version has to be findable in the history afterwards. Until rc.8 the repository had no tags
+      # at all, so "what shipped in rc.N" was answerable only by reading commit subjects - and rc.7 showed what
+      # that costs when a publish happens off-branch.
+      - name: Tag the published version
+        run: |
+          VERSION=$(grep -oPm1 '(?<=<Version>)[^<]+' src/SYT.Fiskaly/SYT.Fiskaly.csproj)
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "SYT.Fiskaly $VERSION"
+          git push origin "v$VERSION"
