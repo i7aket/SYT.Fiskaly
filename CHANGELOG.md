@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.0-rc.9] - 2026-08-22
+
+### Fixed
+- `ApiSecret` no longer demands exactly 43 alphanumeric characters. fiskaly issued a managed-organisation
+  secret of 42 and every provisioning call failed with a `FormatException` that blamed the caller for the
+  vendor's own value. The rule also rejected underscores while the message it threw advertised the format
+  `test_xxx_xxx` — the validation contradicted its own explanation. A credential we did not mint is now
+  checked only for what can honestly be asserted about it: that something is there, and that it is not
+  absurdly long — the same bounds `ApiKey` already uses. A truncated secret is rejected by fiskaly with a
+  401, which is where a vendor rejects its own credential.
+- `ApiSecret.TryFrom` no longer throws. It carried its own copy of the validation instead of the
+  constructor's, so a bound added in one place left the other behind — and it then threw out of a method
+  whose whole contract is that it does not. Both entry points now ask one `Rejection()`.
+
 ## [1.0.0-rc.8] - 2026-08-11
 
 ### Changed (breaking)

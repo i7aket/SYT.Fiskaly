@@ -3,13 +3,20 @@ using SYT.Fiskaly.Authentication.ValueObjects;
 namespace SYT.Fiskaly.UnitTests.Authentication.ValueObjects;
 
 /// <summary>
-/// Tests for ApiSecret value object validation (Recommendation #2 from Mews analysis).
+/// Tests for ApiSecret value object validation.
 /// </summary>
 /// <remarks>
-/// Tests validation improvements from sdk-deep-analysis-from-mews.md:
-/// - ApiSecret: Exact 43 alphanumeric characters (Mews gold standard)
-/// - Pattern: ^[0-9A-Za-z]{43}$ (no special characters, dashes, spaces)
-/// - Fail-fast validation at construction time
+/// The rule is deliberately weak, and these tests are what keeps it weak: a fiskaly API secret is minted
+/// by fiskaly, so the only things this type may honestly assert about one are that something is there and
+/// that it is not absurdly long - the same bounds the sibling ApiKey uses.
+/// <para>
+/// It used to demand exactly 43 alphanumeric characters, and this file enforced that: a 42-character
+/// secret HAD to throw, underscores HAD to be rejected. Then fiskaly issued a managed-organisation secret
+/// of 42 characters and every provisioning call failed with a FormatException that blamed the caller for
+/// the vendor's own value. The old rule also rejected underscores while the message it threw advertised
+/// the format "test_xxx_xxx" - the validation contradicted its own explanation, and the tests agreed with
+/// both at once because they only ever asserted the substring "exactly 43 alphanumeric characters".
+/// </para>
 /// </remarks>
 public class ApiSecretTests
 {
@@ -74,122 +81,77 @@ public class ApiSecretTests
 
     #endregion
 
-    #region From Method - Invalid Length
+    #region From Method - The vendor's own value is accepted
 
+    /// <summary>
+    /// The incident this rule was relaxed for: fiskaly issued a 42-character managed-organisation secret.
+    /// It must be accepted, unchanged, because it is the credential fiskaly expects us to authenticate with.
+    /// </summary>
     [Trait("Category", "Unit")]
     [Fact]
-    public void From_ApiSecret42Chars_ThrowsFormatException()
+    public void From_TheFortyTwoCharacterSecretFiskalyActuallyIssued_IsAccepted()
     {
-        // Arrange: One character short
-        string invalidSecret = new string('a', 42);
+        string issuedByFiskaly = new string('a', 42);
 
-        // Act & Assert
-        FormatException exception = Assert.Throws<FormatException>(() => ApiSecret.From(invalidSecret));
-        Assert.Contains("exactly 43 alphanumeric characters", exception.Message);
-        Assert.Contains("Current value: 42 characters", exception.Message);
+        ApiSecret secret = ApiSecret.From(issuedByFiskaly);
+
+        Assert.Equal(issuedByFiskaly, secret.Value);
     }
 
     [Trait("Category", "Unit")]
-    [Fact]
-    public void From_ApiSecret44Chars_ThrowsFormatException()
+    [Theory]
+    [InlineData(42)]
+    [InlineData(43)]
+    [InlineData(44)]
+    [InlineData(100)]
+    public void From_AnyPlausibleLength_IsAccepted(int length)
     {
-        // Arrange: One character too long
-        string invalidSecret = new string('a', 44);
+        string value = new string('a', length);
 
-        // Act & Assert
-        FormatException exception = Assert.Throws<FormatException>(() => ApiSecret.From(invalidSecret));
-        Assert.Contains("exactly 43 alphanumeric characters", exception.Message);
-        Assert.Contains("Current value: 44 characters", exception.Message);
+        Assert.Equal(value, ApiSecret.From(value).Value);
     }
 
+    /// <summary>
+    /// Characters we do not control either. Underscores are in the format the old error message itself
+    /// advertised while the old pattern rejected them; base64url secrets carry dashes and underscores.
+    /// </summary>
     [Trait("Category", "Unit")]
-    [Fact]
-    public void From_ApiSecret10Chars_ThrowsFormatException()
+    [Theory]
+    [InlineData("test_api_secret_with_underscores_12345678")]
+    [InlineData("test-api-secret-with-dashes-1234567890abc")]
+    [InlineData("test.api.secret.with.dots.1234567890abcdef")]
+    [InlineData("test!@#$%^&*()secret1234567890abcdefghijk")]
+    public void From_CharactersFiskalyMayUse_AreAccepted(string issuedByFiskaly)
     {
-        // Arrange: Far too short
-        string invalidSecret = "tooshort12";
-
-        // Act & Assert
-        FormatException exception = Assert.Throws<FormatException>(() => ApiSecret.From(invalidSecret));
-        Assert.Contains("exactly 43 alphanumeric characters", exception.Message);
-        Assert.Contains("Current value: 10 characters", exception.Message);
-    }
-
-    [Trait("Category", "Unit")]
-    [Fact]
-    public void From_ApiSecret100Chars_ThrowsFormatException()
-    {
-        // Arrange: Far too long
-        string invalidSecret = new string('x', 100);
-
-        // Act & Assert
-        FormatException exception = Assert.Throws<FormatException>(() => ApiSecret.From(invalidSecret));
-        Assert.Contains("exactly 43 alphanumeric characters", exception.Message);
-        Assert.Contains("Current value: 100 characters", exception.Message);
+        Assert.Equal(issuedByFiskaly, ApiSecret.From(issuedByFiskaly).Value);
     }
 
     #endregion
 
-    #region From Method - Invalid Characters
+    #region From Method - Invalid Length
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void From_ApiSecretWithDashes_ThrowsFormatException()
+    public void From_ApiSecretShorterThanTheMinimum_ThrowsFormatException()
     {
-        // Arrange: 43 chars but contains dashes (common mistake)
-        string invalidSecret = "test-api-secret-with-dashes-1234567890abc";
+        // Short enough that it cannot be a credential at all - a truncated paste, not a vendor value.
+        string invalidSecret = "abc";
 
-        // Act & Assert
         FormatException exception = Assert.Throws<FormatException>(() => ApiSecret.From(invalidSecret));
-        Assert.Contains("exactly 43 alphanumeric characters", exception.Message);
+        Assert.Contains("at least 6 characters", exception.Message);
+        Assert.Contains("Current: 3 characters", exception.Message);
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void From_ApiSecretWithUnderscores_ThrowsFormatException()
+    public void From_ApiSecretLongerThanTheMaximum_ThrowsFormatException()
     {
-        // Arrange: 43 chars but contains underscores (common in API keys, not secrets)
-        string invalidSecret = "test_api_secret_with_underscores_12345678";
+        // A whole file or JSON blob pasted into the field, rather than a credential.
+        string invalidSecret = new string('x', 513);
 
-        // Act & Assert
         FormatException exception = Assert.Throws<FormatException>(() => ApiSecret.From(invalidSecret));
-        Assert.Contains("exactly 43 alphanumeric characters", exception.Message);
-    }
-
-    [Trait("Category", "Unit")]
-    [Fact]
-    public void From_ApiSecretWithSpaces_ThrowsFormatException()
-    {
-        // Arrange: 43 chars but contains spaces in middle
-        string invalidSecret = "test api secret with spaces 1234567890abc";
-
-        // Act & Assert
-        FormatException exception = Assert.Throws<FormatException>(() => ApiSecret.From(invalidSecret));
-        Assert.Contains("exactly 43 alphanumeric characters", exception.Message);
-    }
-
-    [Trait("Category", "Unit")]
-    [Fact]
-    public void From_ApiSecretWithSpecialChars_ThrowsFormatException()
-    {
-        // Arrange: 43 chars but contains special characters
-        string invalidSecret = "test!@#$%^&*()secret1234567890abcdefghijk";
-
-        // Act & Assert
-        FormatException exception = Assert.Throws<FormatException>(() => ApiSecret.From(invalidSecret));
-        Assert.Contains("exactly 43 alphanumeric characters", exception.Message);
-    }
-
-    [Trait("Category", "Unit")]
-    [Fact]
-    public void From_ApiSecretWithDots_ThrowsFormatException()
-    {
-        // Arrange: 43 chars but contains dots
-        string invalidSecret = "test.api.secret.with.dots.1234567890abcdef";
-
-        // Act & Assert
-        FormatException exception = Assert.Throws<FormatException>(() => ApiSecret.From(invalidSecret));
-        Assert.Contains("exactly 43 alphanumeric characters", exception.Message);
+        Assert.Contains("must not exceed 512 characters", exception.Message);
+        Assert.Contains("Current: 513 characters", exception.Message);
     }
 
     #endregion
@@ -279,33 +241,27 @@ public class ApiSecretTests
 
     [Trait("Category", "Unit")]
     [Theory]
-    [InlineData("tooshort")] // 8 chars
-    [InlineData("exactly42charactersbutnotfortyThreeChars")] // 42 chars
-    [InlineData("exactly44characterslongthatexceedstheLimit12")] // 44 chars
-    public void TryFrom_InvalidLength_ReturnsFalse(string invalidSecret)
+    [InlineData("abc")]                  // too short to be a credential at all
+    [InlineData("")]                     // nothing at all
+    public void TryFrom_OutsideThePlausibleBand_ReturnsFalse(string invalidSecret)
     {
-        // Act
         bool success = ApiSecret.TryFrom(invalidSecret, out ApiSecret apiSecret);
 
-        // Assert
         Assert.False(success);
         Assert.Equal(default, apiSecret);
     }
 
     [Trait("Category", "Unit")]
     [Theory]
-    [InlineData("test-secret-with-dashes-1234567890abcdefg")] // Dashes
-    [InlineData("test_secret_with_underscores_12345678901")] // Underscores
-    [InlineData("test secret with spaces 1234567890abcdefg")] // Spaces
-    [InlineData("test!@#secret$%^with&*()special1234567890")] // Special chars
-    public void TryFrom_InvalidCharacters_ReturnsFalse(string invalidSecret)
+    [InlineData("test-secret-with-dashes-1234567890abcdefg")]
+    [InlineData("test_secret_with_underscores_12345678901")]
+    [InlineData("test!@#secret$%^with&*()special1234567890")]
+    public void TryFrom_CharactersFiskalyMayUse_ReturnsTrue(string issuedByFiskaly)
     {
-        // Act
-        bool success = ApiSecret.TryFrom(invalidSecret, out ApiSecret apiSecret);
+        bool success = ApiSecret.TryFrom(issuedByFiskaly, out ApiSecret apiSecret);
 
-        // Assert
-        Assert.False(success);
-        Assert.Equal(default, apiSecret);
+        Assert.True(success);
+        Assert.Equal(issuedByFiskaly, apiSecret.Value);
     }
 
     #endregion
@@ -417,12 +373,10 @@ public class ApiSecretTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void Parse_WithInvalidLength_ThrowsFormatException()
+    public void Parse_WithSomethingTooShortToBeACredential_ThrowsFormatException()
     {
-        // Arrange: 42 chars (one short of required 43)
-        string invalidInput = new string('a', 42);
+        string invalidInput = "abc";
 
-        // Act & Assert
         Assert.Throws<FormatException>(() => ApiSecret.Parse(invalidInput, null));
     }
 
@@ -475,32 +429,26 @@ public class ApiSecretTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void TryParse_WithInvalidLength_ReturnsFalse()
+    public void TryParse_WithSomethingTooShortToBeACredential_ReturnsFalse()
     {
-        // Arrange: 42 chars (one short of required 43)
-        string invalidInput = new string('a', 42);
+        string invalidInput = "abc";
 
-        // Act
         bool success = ApiSecret.TryParse(invalidInput, null, out ApiSecret result);
 
-        // Assert
         Assert.False(success);
         Assert.Equal(default, result);
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void TryParse_WithInvalidCharacters_ReturnsFalse()
+    public void TryParse_WithCharactersFiskalyMayUse_ReturnsTrue()
     {
-        // Arrange: 43 chars but contains invalid characters (dashes)
-        string invalidInput = "test-secret-with-dashes-1234567890abcdefg";
+        string issuedByFiskaly = "test-secret-with-dashes-1234567890abcdefg";
 
-        // Act
-        bool success = ApiSecret.TryParse(invalidInput, null, out ApiSecret result);
+        bool success = ApiSecret.TryParse(issuedByFiskaly, null, out ApiSecret result);
 
-        // Assert
-        Assert.False(success);
-        Assert.Equal(default, result);
+        Assert.True(success);
+        Assert.Equal(issuedByFiskaly, result.Value);
     }
 
     #endregion
